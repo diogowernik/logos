@@ -2,12 +2,24 @@
 
 ## 1. Fundação
 
+Concluída: app gerado, dependências e ambientes preparados, banco migrado e
+usuários do Holding copiados com os mesmos logins.
+
 - criar `api/` e `web/` a partir do App Creator;
 - autenticação, banco, storage, testes e CI.
 
 Saída: aplicação vazia executável.
 
 ## 2. Biblioteca e editor
+
+Primeira rodada implementada: biblioteca, Collections, Projects, Texts, Caixa de
+entrada, versões, variações, editor Markdown com preview, busca em títulos e
+conteúdo, copy, movimentação e reordenação direta. A migração inicial do domínio
+foi aplicada ao banco local.
+
+Próximos ajustes desta etapa: avaliação de usabilidade com conteúdo real,
+upload/gestão de imagens e capas e organização de Collections por arrastar.
+Imagens já podem ser exibidas no preview por URLs em Markdown.
 
 - Collection, Project e Text;
 - variações com um nível;

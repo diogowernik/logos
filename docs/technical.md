@@ -58,6 +58,11 @@ uma relação autorreferente. A entidade de linhagem tende a ser mais segura par
 trocar a versão principal sem reescrever uma árvore de relações. Ela é detalhe
 de backend e não faz parte do modelo mental do usuário.
 
+Decisão de implementação: `ProjectFamily` guarda owner, Collection, posição e
+referência à versão principal. Cada `Project` guarda seus próprios dados e
+Texts. A família não aparece como entidade na interface. Criação e troca da
+principal são transacionais; mover um Project de Collection move sua família.
+
 ## Compilação
 
 Um DTO puro, independente do ORM, reúne metadata, Texts principais ordenados e

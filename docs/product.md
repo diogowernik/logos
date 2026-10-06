@@ -123,6 +123,10 @@ principal, o novo Project abre vazio e recebe os novos Markdown pelo mesmo botã
 
 O desenho visual definitivo será tratado separadamente do backend.
 
+O Logos novo pode redesenhar sua experiência com liberdade. Comportamentos úteis
+do legado serão aproveitados quando não houver uma alternativa melhor; não há
+exigência de fidelidade às telas antigas como na reconstrução do Holding.
+
 ## Caixa de entrada
 
 Lugar simples para guardar textos e ideias antes de saber a qual Project
@@ -193,3 +197,8 @@ avançadas da exportação. Nunca podem impedir a geração.
 O legado continua consultável. Somente Projects úteis serão recriados aos
 poucos, por copy/paste de Texts, Markdown completo ou nova importação do EPUB.
 Não haverá migração obrigatória das 946 Publications e dos órfãos.
+
+A seleção inicial será aproximadamente um décimo dos livros, textos e capítulos
+úteis, sem uma quota rígida por entidade. Parte dessa transferência acontecerá
+durante testes de usabilidade. Depois, a biblioteca será recomposta gradualmente
+com novos livros e conteúdo.

@@ -17,3 +17,13 @@
 As recomendações antigas eventualmente presentes nas auditorias não substituem
 os três documentos canônicos acima.
 
+## Planejamento de execução
+
+- [Plano de implementação](implementation-plan.md): diagnóstico dos projetos de
+  referência, sequência de entregas e participação humana necessária. É uma
+  proposta derivada da direção canônica, sem substituir suas decisões.
+
+## Desenvolvimento
+
+- [Executar localmente](development.md).
+- [Fundação técnica](foundation.md).

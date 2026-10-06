@@ -24,10 +24,12 @@ Veja a [documentação](docs/README.md).
 
 ## Estado
 
-A auditoria do legado e a direção do produto estão documentadas. A aplicação
-nova ainda não foi implementada. O legado permanece intacto em:
+A primeira biblioteca e o editor Markdown estão implementados sobre a fundação
+Django/Next do App Creator. Reader, arquivos EPUB e upload de imagens vêm nas
+próximas rodadas. Veja [como executar](docs/development.md).
+
+O legado permanece intacto em:
 
 - frontend: `/Users/diogo/Development/monorepo/front/logos`;
 - backend: `/Users/diogo/Development/monorepo/back/publications`;
 - identidades: `/Users/diogo/Development/monorepo/back/profiles`.
-

@@ -1,17 +1,25 @@
 from django.db import transaction
 from django.db.models import F, Q
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from .models import Collection, Project, ProjectFamily, Text
+from .models import Collection, ExportArtifact, Project, ProjectFamily, Text
+from .asset_serializers import AssetSerializer, ImageUploadSerializer
+from .services.assets import upload_cover
+from .epub import EpubGenerationError
+from .export_serializers import ExportArtifactSerializer
+from .services.exports import export_project_epub
 from .serializers import CollectionSerializer, ProjectSerializer, TextSerializer, TextListSerializer
 from .services import (
     compile_project,
     create_project,
+    duplicate_project,
     move_text,
     new_version,
     reorder_texts,
@@ -67,6 +75,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def content(self, request, pk=None):
         project = self.get_object()
+        artifact = ExportArtifact.objects.filter(project=project).first()
         return Response(
             {
                 "project": self.get_serializer(project).data,
@@ -74,12 +83,50 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 "versions": self.get_serializer(
                     project.family.versions.order_by("-id"), many=True
                 ).data,
+                "assets": AssetSerializer(project.family.assets.all(), many=True).data,
+                "epub": ExportArtifactSerializer(artifact).data if artifact else None,
             }
         )
 
     @action(detail=True, methods=["get"])
     def markdown(self, request, pk=None):
         return Response({"markdown": compile_project(self.get_object()).markdown()})
+
+    @action(detail=True, methods=["post"])
+    def epub(self, request, pk=None):
+        project = self.get_object()
+        try:
+            artifact = export_project_epub(project)
+        except EpubGenerationError as error:
+            raise ValidationError(str(error)) from error
+        return Response(ExportArtifactSerializer(artifact).data)
+
+    @action(detail=True, methods=["get"], url_path="epub/file")
+    def epub_file(self, request, pk=None):
+        artifact = get_object_or_404(ExportArtifact, project=self.get_object())
+        try:
+            file = artifact.file.open("rb")
+        except FileNotFoundError as error:
+            raise Http404("EPUB não encontrado. Gere o arquivo novamente.") from error
+        response = FileResponse(file, content_type="application/epub+zip",
+                                as_attachment=True, filename=artifact.filename)
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @action(detail=True, methods=["post", "delete"], parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def cover(self, request, pk=None):
+        project = self.get_object()
+        if project.family.is_inbox:
+            raise ValidationError("Escolha um projeto para definir a capa.")
+        if request.method == "DELETE":
+            project.cover = None
+            project.save(update_fields=["cover", "updated_at"])
+        else:
+            serializer = ImageUploadSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            upload_cover(project, serializer.validated_data["image"])
+        return Response(self.get_serializer(project).data)
 
     @action(detail=True, methods=["post"], url_path="new-version")
     def new_version(self, request, pk=None):
@@ -94,29 +141,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def duplicate(self, request, pk=None):
-        original = self.get_object()
-        with transaction.atomic():
-            project = create_project(
-                request.user, f"{original.title} — cópia", original.family.collection
-            )
-            project.subtitle, project.author = original.subtitle, original.author
-            project.save()
-            parents = {}
-            for text in original.texts.filter(parent=None):
-                parents[text.pk] = Text.objects.create(
-                    project=project,
-                    title=text.title,
-                    markdown=text.markdown,
-                    position=text.position,
-                )
-            for text in original.texts.exclude(parent=None):
-                Text.objects.create(
-                    project=project,
-                    parent=parents[text.parent_id],
-                    title=text.title,
-                    markdown=text.markdown,
-                    position=text.position,
-                )
+        project = duplicate_project(self.get_object(), request.user)
         return Response(self.get_serializer(project).data, status=201)
 
     @action(detail=True, methods=["post"])

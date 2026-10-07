@@ -24,8 +24,10 @@ versões, variações, editor Markdown com preview, busca em títulos e
 conteúdo, copy, movimentação e reordenação direta. A migração inicial do domínio
 foi aplicada ao banco local.
 
+Capas implementadas: upload na visão geral, exibição na biblioteca, arquivos
+privados por projeto, troca e reutilização de imagens enviadas.
 Próximos ajustes desta etapa: avaliação de usabilidade com conteúdo real,
-upload/gestão de imagens e capas e organização de Collections por arrastar.
+imagens no corpo do texto e organização de Collections por arrastar.
 Imagens já podem ser exibidas no preview por URLs em Markdown.
 
 - Collection, Project e Text;
@@ -49,13 +51,25 @@ preview lateral. A evolução do reader e do progresso de leitura fica para outr
 etapa, depois da experiência de trabalho e limpeza de ebooks.
 
 - compilação comum;
-- normalização de títulos duplicados;
+- conteúdo formado somente pelo Markdown salvo, sem inserir títulos cadastrados;
 - reader contínuo e progresso;
 - testes com Markdown extenso.
 
 Saída: copy e reader mostram os mesmos Texts principais na mesma ordem.
 
 ## 4. Gerador de EPUB
+
+Primeira geração implementada, adaptando os serviços do legado
+(`md_to_epub_service.py`, `md_to_epub_utils.py` e `markdown_utils.py`) e
+reaproveitando o motor EbookLib. Services organizados por responsabilidade,
+seguindo o padrão do Holding.
+O corpo vem somente do Markdown, na ordem dos Texts principais: `#` identifica
+capítulo e `##` subcapítulo. Títulos cadastrados não são inseridos no conteúdo.
+Geração e download privados na visão geral, usando a capa já enviada. O último
+EPUB pertence à versão que o gerou e é substituído somente após sucesso.
+Próximos passos: testar ebooks reais no Kindle, opções de idioma e guia de
+Markdown. A checagem atual cobre estrutura XML/ZIP e recursos do pacote;
+validação completa com EPUBCheck fica para a evolução do gerador.
 
 - capa, assets, TOC, spine e metadata;
 - idioma automático com opção avançada;
@@ -103,5 +117,5 @@ solto pode ser adicionado a Project pelo menu ou arrastando um recente.
 Project abre na visão geral, com sumário ordenável, informações, versões, copy e
 leitura completa; capítulos abrem diretamente. Caminho clicável compacto,
 preview lateral opcional à direita. Cartões de Projects e
-Collections preservados; upload de capas e geração de EPUB seguem nas etapas
-de imagens e publicação.
+Collections preservados; upload de capas concluído. Geração de EPUB segue
+na etapa de publicação.

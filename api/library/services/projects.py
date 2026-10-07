@@ -2,8 +2,9 @@ from django.db import transaction
 from django.db.models import Max
 from rest_framework.exceptions import ValidationError
 
-from .compilation import Manuscript, Section
-from .models import Project, ProjectFamily, Text
+from ..compilation import Manuscript, Section
+from ..models import Project, ProjectFamily, Text
+from .assets import copy_assets
 
 
 def next_position(queryset):
@@ -30,7 +31,11 @@ def new_version(project):
     if family.is_inbox:
         raise ValidationError("A Caixa de entrada não possui versões.")
     replacement = Project.objects.create(
-        family=family, title=project.title, subtitle=project.subtitle, author=project.author
+        family=family,
+        title=project.title,
+        subtitle=project.subtitle,
+        author=project.author,
+        cover_id=project.cover_id,
     )
     family.principal = replacement
     family.save(update_fields=["principal"])
@@ -56,23 +61,25 @@ def compile_project(project):
 
 
 @transaction.atomic
-def reorder_texts(project, ids):
-    if not isinstance(ids, list) or any(type(item) is not int for item in ids):
-        raise ValidationError("Envie a lista completa de IDs dos textos principais.")
-    Project.objects.select_for_update().get(pk=project.pk)
-    texts = {text.pk: text for text in project.texts.filter(parent=None)}
-    if len(ids) != len(set(ids)) or set(ids) != set(texts):
-        raise ValidationError("A ordem deve conter todos os textos principais, uma única vez.")
-    for position, pk in enumerate(ids):
-        texts[pk].position = position
-    Text.objects.bulk_update(texts.values(), ["position"])
-
-
-@transaction.atomic
-def move_text(text, project):
-    if text.parent_id:
-        text.parent = None
-    text.project = project
-    text.position = next_position(project.texts.filter(parent=None))
-    text.save()
-    text.variations.update(project=project)
+def duplicate_project(original, owner):
+    project = create_project(owner, f"{original.title} — cópia", original.family.collection)
+    project.subtitle, project.author = original.subtitle, original.author
+    project.save(update_fields=["subtitle", "author"])
+    parents = {}
+    for text in original.texts.filter(parent=None):
+        parents[text.pk] = Text.objects.create(
+            project=project,
+            title=text.title,
+            markdown=text.markdown,
+            position=text.position,
+        )
+    for text in original.texts.exclude(parent=None):
+        Text.objects.create(
+            project=project,
+            parent=parents[text.parent_id],
+            title=text.title,
+            markdown=text.markdown,
+            position=text.position,
+        )
+    copy_assets(original, project)
+    return project

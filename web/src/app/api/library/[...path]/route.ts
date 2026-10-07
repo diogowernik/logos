@@ -11,12 +11,16 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   try {
     const upstream = await djangoFetch(`/api/library/${path.map(encodeURIComponent).join("/")}/${request.nextUrl.search}`, {
       method: request.method,
-      headers: { Authorization: `Token ${token}`, "Content-Type": "application/json" },
-      body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.text(),
+      headers: { Authorization: `Token ${token}`, "Content-Type": request.headers.get("content-type") ?? "application/json" },
+      body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.arrayBuffer(),
+      ...(request.method === "POST" && path.at(-1) === "epub" ? { signal: AbortSignal.timeout(60_000) } : {}),
     });
     const headers = new Headers({ "Content-Type": upstream.headers.get("content-type") ?? "application/json",
       "Cache-Control": "private, no-store", "Vary": "Cookie" });
-    return new Response(upstream.status === 204 ? null : await upstream.text(), { status: upstream.status, headers });
+    const disposition = upstream.headers.get("content-disposition");
+    if (disposition) headers.set("Content-Disposition", disposition);
+    headers.set("X-Content-Type-Options", "nosniff");
+    return new Response(upstream.status === 204 ? null : upstream.body, { status: upstream.status, headers });
   } catch {
     return noStoreJson({ detail: "A API não respondeu. Tente novamente." }, { status: 502 });
   }

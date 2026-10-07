@@ -71,12 +71,34 @@ listagens e buscas privadas não carregam todos os corpos Markdown.
 
 ## Compilação
 
+Services seguem a separação já usada no Holding: `services/projects.py` e
+`services/texts.py` mantêm operações do domínio; `services/assets.py` cuida dos
+arquivos; `services/exports.py` orquestra compilação, geração e persistência.
+Views apenas autorizam, chamam o service e serializam a resposta.
+
+O pacote `epub/` adapta o motor do legado: conversão de Markdown com as mesmas
+extensões e pagebreaks, preparação de capítulos e sumário, e montagem EbookLib.
+Esse motor recebe dados simples e não consulta ORM nem gerencia storage.
+
+`ExportArtifact` guarda o último EPUB de cada Project, checksum e versão do
+gerador. A geração é síncrona. O novo arquivo é montado e inspecionado antes de
+ser salvo; a troca é transacional e a exclusão do anterior ocorre após commit.
+O download é privado. Nova versão nasce sem EPUB; cópia independente também
+precisa gerar seu próprio EPUB.
+
+Imagens do Project referenciadas no Markdown são incorporadas por seus URLs
+privados; recursos remotos não são baixados nesta rodada. Capas JPEG/PNG mantêm
+o formato, e WebP é convertido para PNG para compatibilidade EPUB. A validação
+local verifica mimetype, ZIP, XML, manifest e spine; não substitui EPUBCheck.
+O proxy reserva até 60 segundos para gerar, mantendo o timeout usual nas outras
+operações.
+
 Um DTO puro, independente do ORM, reúne metadata, Texts principais ordenados e
 assets. Markdown completo, reader e EPUB consomem esse mesmo DTO.
 
 Regras mínimas:
 
-- não duplicar título quando o corpo já começa com heading equivalente;
+- corpo formado somente pelo Markdown, sem injetar títulos cadastrados;
 - nunca filtrar conteúdo por idioma;
 - preservar headings, tabelas, footnotes, listas e imagens;
 - usar a mesma ordem em todas as saídas;
@@ -99,6 +121,21 @@ seguro. Autoria é metadata, não autorização.
 - permitir retry sem duplicação silenciosa.
 
 ## Segurança e storage
+
+Capas usam `Asset`, vinculado à família do Project. O caminho local é
+`media/projects/<family-id>/images/<asset-uuid>.<ext>`, independente do título.
+`ebooks/` e `originals/` serão usados pelas próximas etapas dentro da mesma
+pasta. JPEG, PNG e WebP são aceitos até 10 MB, com validação real da imagem.
+
+Cada versão escolhe sua capa entre os arquivos compartilhados. Trocar ou
+remover a capa conserva a imagem na lista de arquivos. Duplicar um Project
+copia seus arquivos para uma nova família; excluir a família apaga os arquivos
+após a transação. Excluir somente uma versão mantém os arquivos compartilhados.
+
+Arquivos são servidos por endpoint autenticado e filtrado pelo proprietário,
+através do proxy Next. O proxy preserva multipart no envio e bytes no download.
+Não há exposição pública de `MEDIA_ROOT`; imagens privadas usam a sessão do
+browser, sem otimização remota do Next.
 
 - todo conteúdo privado parte do usuário autenticado;
 - jobs e arquivos pertencem ao usuário;

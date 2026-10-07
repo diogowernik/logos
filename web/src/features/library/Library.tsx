@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
 import type { Collection, Project, TextSummary } from "./types";
+import { PrivateImage } from "@/components/PrivateImage";
+import "./project-files.css";
 
 export function Library({ collectionId = null, autofocus = false, createKind = null }: {
   collectionId?: number | null; autofocus?: boolean; createKind?: "project" | "collection" | null;
@@ -64,7 +66,7 @@ export function Library({ collectionId = null, autofocus = false, createKind = n
     {loading ? <p>Carregando biblioteca…</p> : <>
       {visible.length > 0 && <section className="library-section"><h2>Projetos</h2><div className="project-grid">
         {visible.map((project) => <Link className="project-card" href={`/projects/${project.id}`} key={project.id}>
-          <span className="card-art" aria-hidden="true">¶</span><h3>{project.title}</h3>{project.subtitle && <p>{project.subtitle}</p>}
+          <span className="card-art" aria-hidden="true">{project.cover_url ? <PrivateImage className="book-cover" src={project.cover_url} alt="" /> : "¶"}</span><h3>{project.title}</h3>{project.subtitle && <p>{project.subtitle}</p>}
           <div className="project-card-footer"><span>{project.text_count} {project.text_count === 1 ? "texto" : "textos"}</span><span>{collections.find((collection) => collection.id === project.collection)?.title ?? ""}</span></div>
         </Link>)}
       </div></section>}

@@ -15,6 +15,20 @@ class LibraryTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
+    def test_compilation_uses_only_ordered_markdown_without_registered_titles(self):
+        project = create_project(self.user, "Título cadastrado")
+        project.subtitle = "Subtítulo cadastrado"
+        project.save()
+        Text.objects.create(project=project, title="Outro título", markdown="## Parte\n\nSegundo.", position=1)
+        first = Text.objects.create(project=project, title="Título do texto", markdown="# Capítulo\n\nPrimeiro.", position=0)
+        Text.objects.create(project=project, title="Sem conteúdo", markdown="", position=2)
+        Text.objects.create(project=project, parent=first, markdown="VARIAÇÃO")
+        self.assertEqual(
+            compile_project(project).markdown(),
+            "# Capítulo\n\nPrimeiro.\n\n## Parte\n\nSegundo.\n",
+        )
+        self.assertEqual(self.client.get(f"/api/library/texts/{first.pk}/").data["compiled_markdown"], first.markdown)
+
     def test_simple_write_edit_and_compile_without_editorial_metadata(self):
         response = self.client.post("/api/library/projects/", {}, format="json")
         self.assertEqual(response.status_code, 201)
@@ -67,7 +81,7 @@ class LibraryTests(TestCase):
 
     def test_failed_new_version_keeps_previous_main(self):
         project = create_project(self.user, "Original")
-        with patch("library.services.ProjectFamily.save", side_effect=RuntimeError("failed")):
+        with patch("library.services.projects.ProjectFamily.save", side_effect=RuntimeError("failed")):
             with self.assertRaises(RuntimeError):
                 new_version(project)
         self.assertEqual(Project.objects.count(), 1)

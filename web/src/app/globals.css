@@ -144,7 +144,6 @@ summary { cursor: pointer; }
 .empty-state .button-row { justify-content: center; }
 .project-overview { background: var(--surface); border: 1px solid #dfe3e9; border-radius: var(--radius); padding: 1.5rem; }
 .overview-heading { display: flex; gap: 1.5rem; align-items: center; margin-bottom: 2rem; }
-.overview-cover { display: grid; place-items: center; width: 140px; aspect-ratio: 3 / 4; flex-shrink: 0; border-radius: var(--radius); background: #e9eef8; color: var(--accent); font: 3rem Georgia, serif; }
 .overview-description { min-width: 0; }
 .overview-description h1 { margin: .4rem 0 .75rem; font-size: 1.8rem; overflow-wrap: anywhere; }
 .overview-description p { margin: .5rem 0; }
@@ -173,7 +172,6 @@ summary { cursor: pointer; }
   .project-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .editor-paper { padding: 1.2rem; }
   .overview-heading { align-items: flex-start; gap: 1rem; }
-  .overview-cover { width: 72px; font-size: 2rem; }
   .project-overview { padding: 1rem; }
   .overview-description h1 { font-size: 1.4rem; }
   .overview-section-heading { flex-wrap: wrap; }

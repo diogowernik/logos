@@ -39,3 +39,11 @@ export function CopyIcon() {
 export function SaveIcon() {
   return <Icon><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z" /><path d="M7 3v6h9V3M7 21v-7h10v7" /></Icon>;
 }
+
+export function ImageIcon() {
+  return <Icon><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5-7 8M3 16l4-4 4 4" /></Icon>;
+}
+
+export function DownloadIcon() {
+  return <Icon><path d="M12 3v12m-5-5 5 5 5-5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></Icon>;
+}

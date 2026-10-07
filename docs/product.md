@@ -107,6 +107,10 @@ copiada, excluída ou movida para a lista principal.
 Por padrão, somente os Texts principais entram no Markdown completo, reader e
 EPUB. Variações não entram silenciosamente.
 
+O conteúdo dessas saídas vem somente do Markdown salvo. Títulos e subtítulos
+cadastrados são usados para organização e navegação, sem serem inseridos no
+corpo do livro. `#` marca capítulo e `##` subcapítulo no futuro gerador.
+
 ## Frontend — comportamento simples
 
 No Project, o comportamento já comprovado é:
@@ -197,6 +201,29 @@ O original é preservado. O Project extraído pode ser corrigido ou servir apena
 para copiar o Markdown e criar outro Project limpo.
 
 ## Consumo
+
+### Capa e arquivos do Project
+
+Na visão geral, clicar na capa permite enviar ou trocar a imagem, em uma ação
+única. Ela aparece também no cartão da biblioteca, sem recortar seu conteúdo.
+Imagens anteriores continuam nos arquivos do Project e podem voltar a ser capa.
+
+Arquivos ficam reunidos sob `projects/<identificador>/`, com imagens em
+`images/`, EPUBs em `ebooks/` e fontes em `originals/`. O identificador permanece
+estável ao renomear o Project. Versões compartilham os arquivos, mas cada versão
+escolhe sua capa. Uma cópia independente recebe seus próprios arquivos.
+
+Na visão geral, **Gerar EPUB** produz o arquivo a partir do Markdown salvo,
+incluindo a capa escolhida. **Baixar EPUB** recupera a última geração desta
+versão do Project. Gerar novamente só substitui o arquivo anterior depois do
+sucesso; editar o texto não gera EPUB automaticamente.
+
+`#` abre um capítulo e `##` entra no sumário como subcapítulo. Conteúdo sem
+heading também é preservado, com uma entrada neutra no sumário. O título interno
+do EPUB vem do primeiro `#` do Markdown, com fallback neutro quando ausente.
+Títulos cadastrados não entram no EPUB; o nome do Project identifica o arquivo
+baixado. A autoria opcional é metadata técnica. O idioma inicial é `pt-BR`,
+sem filtrar textos nem exigir configuração.
 
 O mesmo conteúdo pode ser:
 

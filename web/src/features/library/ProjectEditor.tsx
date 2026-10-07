@@ -8,6 +8,9 @@ import { CopyIcon, SaveIcon, SidebarIcon } from "@/components/icons/NavigationIc
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
 import type { Project, ProjectContent, Text } from "./types";
+import { ProjectCover } from "./ProjectCover";
+import { ProjectFiles } from "./ProjectFiles";
+import { ProjectExport } from "./ProjectExport";
 
 export function ProjectEditor({ projectId, initialView = "overview", initialTextId }: {
   projectId: string; initialView?: "overview" | "text" | "new" | "book"; initialTextId?: number;
@@ -138,7 +141,7 @@ export function ProjectEditor({ projectId, initialView = "overview", initialText
   async function projectAction(action: "duplicate" | "new-version" | "delete") {
     if (!data || !canLeave()) return;
     if (action === "new-version" && !window.confirm("Criar uma nova versão principal vazia? O conteúdo atual ficará na versão anterior.")) return;
-    if (action === "delete" && !window.confirm(data.project.is_principal ? "Excluir o projeto, todas as versões e todos os textos?" : "Excluir esta versão e seus textos? A versão principal será preservada.")) return;
+    if (action === "delete" && !window.confirm(data.project.is_principal ? "Excluir o projeto, todas as versões, textos e arquivos?" : "Excluir esta versão e seus textos? A versão principal será preservada.")) return;
     setPending(true); setError("");
     try {
       if (action === "delete") { await libraryRequest(`projects/${projectId}`, "DELETE"); await refreshLibrary(); router.push("/"); }
@@ -229,6 +232,12 @@ export function ProjectEditor({ projectId, initialView = "overview", initialText
     catch (reason) { setError(errorMessage(reason)); }
   }
 
+  function updateCover(updated: Project) {
+    setData((current) => current && { ...current, project: updated });
+    void libraryRequest<ProjectContent>(`projects/${projectId}/content`).then(setData).catch((reason) => setError(errorMessage(reason)));
+    void refreshLibrary();
+  }
+
   return <div className="project-workspace">
     <div className="workspace-path"><nav className="breadcrumbs" aria-label="Caminho">
       <Link href="/">Biblioteca</Link>
@@ -251,7 +260,8 @@ export function ProjectEditor({ projectId, initialView = "overview", initialText
     }}>Restaurar como principal</button></div>}
     {error && !properties && !moving && <p role="alert">{error}</p>}
     {view === "overview" && <section className="project-overview">
-      <div className="overview-heading"><div className="overview-cover" aria-hidden="true">¶</div><div className="overview-description"><span className="eyebrow">Projeto</span><h1>{project.is_inbox ? "Textos soltos" : project.title}</h1>{project.subtitle && <p>{project.subtitle}</p>}{project.author && <p>{project.author}</p>}<p>{primary.length} {primary.length === 1 ? "texto" : "textos"}</p><div className="button-row"><button className="secondary" onClick={readBook} disabled={!primary.length}>Ler livro</button><button className="secondary" onClick={copyBook}>Copiar livro</button><button className="text-action" onClick={() => setProperties(true)}>Editar informações</button></div></div></div>
+      <div className="overview-heading">{!project.is_inbox && <ProjectCover project={project} onChange={updateCover} />}<div className="overview-description"><span className="eyebrow">Projeto</span><h1>{project.is_inbox ? "Textos soltos" : project.title}</h1>{project.subtitle && <p>{project.subtitle}</p>}{project.author && <p>{project.author}</p>}<p>{primary.length} {primary.length === 1 ? "texto" : "textos"}</p><div className="button-row"><button className="secondary" onClick={readBook} disabled={!primary.length}>Ler livro</button><button className="secondary" onClick={copyBook}>Copiar livro</button><button className="text-action" onClick={() => setProperties(true)}>Editar informações</button></div></div></div>
+      {!project.is_inbox && <ProjectExport projectId={project.id} artifact={data.epub ?? null} hasContent={primary.some((text) => text.markdown.trim())} onChange={(epub) => setData((current) => current && { ...current, epub })} />}
       <section className="overview-chapters"><div className="overview-section-heading"><h2>Sumário</h2><Link className="button-link" href={`/projects/${project.id}/new`}>+ Adicionar texto</Link></div>
         {primary.length === 0 && <p className="outline-empty">Adicione seu primeiro texto para começar.</p>}
         {primary.map((text, index) => <div data-text-id={text.id} className="overview-chapter" key={text.id}>
@@ -259,6 +269,7 @@ export function ProjectEditor({ projectId, initialView = "overview", initialText
           <span className="text-number">{String(index + 1).padStart(2, "0")}</span><Link href={`/texts/${text.id}`}>{text.title || "Sem título"}</Link><small>{text.markdown.trim() ? text.markdown.trim().split(/\s+/).length : 0} palavras</small>
         </div>)}
       </section>
+      <ProjectFiles project={project} assets={data.assets ?? []} onChange={updateCover} />
       {data.versions.length > 1 && <details className="project-versions"><summary>Versões do projeto</summary>{data.versions.map((version) => <Link className="version-link" key={version.id} href={`/projects/${version.id}`}>{version.is_principal ? "● " : "○ "}{version.title}<small>{version.is_principal ? "Principal" : `${version.text_count} textos`}</small></Link>)}</details>}
       {notice && <p role="status">{notice}</p>}
     </section>}

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Collection, Project, Text
+from .models import Asset, Collection, Project, Text
 from .compilation import Section
 from .services import create_project, next_position
 
@@ -70,6 +70,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     is_principal = serializers.SerializerMethodField()
     is_inbox = serializers.BooleanField(source="family.is_inbox", read_only=True)
     text_count = serializers.SerializerMethodField()
+    cover = serializers.PrimaryKeyRelatedField(queryset=Asset.objects.all(), allow_null=True, required=False)
+    cover_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -84,6 +86,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "is_inbox",
             "text_count",
             "updated_at",
+            "cover",
+            "cover_url",
         ]
         extra_kwargs = {"title": {"required": False, "allow_blank": True}}
 
@@ -93,6 +97,13 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_text_count(self, obj):
         return obj.texts.filter(parent=None).count()
 
+    def get_cover_url(self, obj):
+        return f"/api/library/assets/{obj.cover_id}/file" if obj.cover_id else None
+
+    def validate_cover(self, asset):
+        if asset and (not self.instance or asset.family_id != self.instance.family_id):
+            raise serializers.ValidationError("Escolha uma imagem deste projeto.")
+        return asset
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["collection"] = instance.family.collection_id

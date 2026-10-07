@@ -162,8 +162,40 @@ A lateral segue as referências fornecidas do GPT: mesma escala de texto,
 peso normal, cores neutras suaves, ícones SVG de 20px e linhas alinhadas.
 Projects usam pasta; no hover/foco aparece o lápis para adicionar um Text e o
 menu contextual. Em dispositivos sem hover, as ações permanecem visíveis.
-Os padrões do Holding serão considerados depois, preservando este formato de
-navegação. O estilo da lateral vive em `sidebar.css`, junto de seu componente.
+O formato de navegação será preservado na consolidação visual descrita abaixo.
+Atualmente seu estilo vive em `sidebar.css`, junto de seu componente; os papéis
+comuns de cor, fonte e controles serão transferidos à base compartilhada.
+
+## Direção visual — próxima rodada
+
+Planejada em 7 de outubro de 2026; implementação pendente. A sequência é
+`Holding -> Logos -> App Creator`. Primeiro consolidar a identidade do app,
+substituindo ajustes locais repetidos; depois organizar conteúdo, imagens e
+novas possibilidades de produto.
+
+MUI e Geist são a base escolhida para a família. A refatoração pode substituir
+diretamente o frontend atual, preservando dados e fluxos editoriais úteis.
+O objetivo é chegar à estrutura final compartilhável e remover a base visual
+superada, sem manter versões intermediárias por compatibilidade.
+
+Criar e editar textos segue a leveza da referência visual do GPT fornecida:
+fontes de tamanho uniforme na lateral, pesos moderados, cores neutras suaves,
+área de escrita confortável e ações discretas. A inteligência editorial é de
+quem escreve, reúne e revisa os textos; não há integração de IA nessa rodada.
+
+Biblioteca e livro usam Card e Paper com a forma, a tipografia, o cabeçalho
+econômico e o alinhamento de ações aprovados na Holding, em cores mais neutras.
+Copiar e salvar usam ícones quando presentes. Cores e estados são centralizados
+para mudar a identidade do app em um ponto; erros seguem a família laranja.
+
+Os painéis esquerdo e direito são recolhíveis e pertencem à estrutura de
+trabalho. O direito pode abrir vazio na biblioteca; preview de ebook ou leitura
+serão definidos depois. O preview de Markdown durante a escrita permanece.
+
+As duas composições compartilham tema, fontes, controles e espaçamentos. A base
+consolidada, os painéis opcionais e o guia de interface beneficiarão o template
+do App Creator. O [plano de execução](frontend-layout-plan.md) detalha essa
+direção sem alterar as regras editoriais acima.
 
 ## Ações principais
 

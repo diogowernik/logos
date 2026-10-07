@@ -7,6 +7,12 @@ ebooks. A página de edição chegou a uma base aprovada, intuitiva e econômica
 controles. Próximas melhorias devem partir do uso real. A experiência completa
 de leitura fica para outra etapa; o preview é uma ferramenta de edição.
 
+Próxima execução: consolidação global da fundação visual, antes da reorganização
+detalhada de conteúdo e da ampliação de funcionalidades. Planejamento concluído
+em 7 de outubro de 2026; código ainda não alterado. A direção está em
+`product.md`, a arquitetura em `technical.md` e as fatias de execução no
+[plano visual](frontend-layout-plan.md).
+
 ## 1. Fundação
 
 Concluída: app gerado, dependências e ambientes preparados, banco migrado e
@@ -102,7 +108,7 @@ Quando o volume da biblioteca justificar, adicionar uma aba opcional de Pastas
 e subpastas para organizar Collections, Projects e textos soltos. Pastas não
 alteram compilação, reader ou EPUB.
 
-## Próxima rodada de interface
+## Interface — entregas anteriores
 
 Primeiro ajuste concluído no Logos: barra azul `#1976d2`, logo Wtree branca,
 largura total, navegação com seleção arredondada, posição fixa durante a rolagem
@@ -119,3 +125,27 @@ leitura completa; capítulos abrem diretamente. Caminho clicável compacto,
 preview lateral opcional à direita. Cartões de Projects e
 Collections preservados; upload de capas concluído. Geração de EPUB segue
 na etapa de publicação.
+
+## Interface — consolidação global planejada
+
+Sequência: `Holding -> Logos -> App Creator`.
+
+- [x] Estudar código, estilos e documentação das bases atuais.
+- [x] Consolidar a direção com imagens e preferências do usuário.
+- [x] Mapear arquitetura, consumidores, remoções e validação.
+- [x] Confirmar MUI + Geist e refatoração direta da fundação visual.
+- [ ] Integrar MUI/Emotion/Next com manifestos e locks compatíveis.
+- [ ] Reaproveitar tema da Holding com identidade neutra; erro em laranja.
+- [ ] Usar controles MUI e reutilizar composições de cabeçalho da Holding.
+- [ ] Separar os painéis recolhíveis dos dados e da disponibilidade do preview.
+- [ ] Permitir painel direito vazio na biblioteca.
+- [ ] Refatorar todas as views e remover componentes/estilos substituídos.
+- [ ] Validar escrita, navegação, responsividade e troca de identidade.
+- [ ] Registrar o guia de interface alinhado aos componentes implementados.
+- [ ] Transferir fundação genérica e guia ao template do App Creator.
+- [ ] Validar geração limpa e independência do app gerado.
+
+Criar/editar segue a leveza visual da referência GPT; biblioteca/livro usam
+cards da Holding em paleta neutra. O [plano](frontend-layout-plan.md) detalha
+responsabilidades e sequência. Organização fina de capas, textos e ações,
+preview de ebook e evolução de leitura ficam para rodadas posteriores.

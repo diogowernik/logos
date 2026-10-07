@@ -22,6 +22,10 @@ os três documentos canônicos acima.
 - [Plano de implementação](implementation-plan.md): diagnóstico dos projetos de
   referência, sequência de entregas e participação humana necessária. É uma
   proposta derivada da direção canônica, sem substituir suas decisões.
+- [Fundação visual](frontend-layout-plan.md): planejamento da rodada
+  `Holding -> Logos -> App Creator`, com tema, componentes, painéis,
+  migração de consumidores e critérios de validação. Implementação pendente;
+  detalha produto, notas técnicas e roadmap.
 
 ## Desenvolvimento
 

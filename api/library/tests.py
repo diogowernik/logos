@@ -129,3 +129,31 @@ class LibraryTests(TestCase):
         ).data
         self.client.delete(f"/api/library/collections/{collection['id']}/")
         self.assertTrue(Project.objects.filter(pk=project["id"]).exists())
+
+    def test_recents_search_and_loose_texts_remain_private_and_movable(self):
+        loose_project = Project.objects.get(pk=self.client.post("/api/library/projects/inbox/").data["id"])
+        loose = Text.objects.create(project=loose_project, title="Ideia solta", markdown="agulha")
+        project = create_project(self.user, "Livro")
+        chapter = Text.objects.create(project=project, title="Capítulo", markdown="agulha")
+        Text.objects.create(project=project, parent=chapter, title="Variação")
+        Text.objects.create(project=create_project(self.other), title="Privado", markdown="agulha")
+        self.client.post(f"/api/library/texts/{loose.pk}/open/")
+        recent = self.client.get("/api/library/texts/recent/").data
+        self.assertEqual([item["id"] for item in recent], [loose.pk, chapter.pk])
+        self.assertTrue(recent[0]["is_loose"])
+        self.assertNotIn("markdown", recent[0])
+        self.assertEqual(len(self.client.get("/api/library/texts/?search=agulha").data), 2)
+        self.assertEqual(len(self.client.get("/api/library/texts/?loose=1").data), 1)
+        self.client.post(f"/api/library/texts/{loose.pk}/move/", {"project": project.pk}, format="json")
+        self.assertEqual(self.client.get("/api/library/texts/?loose=1").data, [])
+        self.assertFalse(self.client.get("/api/library/texts/recent/").data[0]["is_loose"])
+        self.assertIn("agulha", compile_project(project).markdown())
+
+    def test_reader_uses_compilation_and_recents_exclude_secondary_versions(self):
+        project = create_project(self.user, "Livro")
+        text = Text.objects.create(project=project, title="Capítulo", markdown="## Capítulo\n\nConteúdo.")
+        compiled_text = self.client.get(f"/api/library/texts/{text.pk}/").data["compiled_markdown"]
+        self.assertEqual(compiled_text.count("## Capítulo"), 1)
+        self.assertIn(compiled_text, compile_project(project).markdown())
+        new_version(project)
+        self.assertEqual(self.client.get("/api/library/texts/recent/").data, [])

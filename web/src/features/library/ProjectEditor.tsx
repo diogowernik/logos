@@ -2,19 +2,24 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { Markdown } from "@/components/Markdown";
+import { CopyIcon, SaveIcon, SidebarIcon } from "@/components/icons/NavigationIcons";
 import { libraryRequest, errorMessage } from "./api";
-import type { Collection, Project, ProjectContent, Text } from "./types";
+import { useLibrary } from "./LibraryShell";
+import type { Project, ProjectContent, Text } from "./types";
 
-export function ProjectEditor({ projectId }: { projectId: string }) {
+export function ProjectEditor({ projectId, initialView = "overview", initialTextId }: {
+  projectId: string; initialView?: "overview" | "text" | "new" | "book"; initialTextId?: number;
+}) {
   const router = useRouter();
+  const { projects, collections, refresh: refreshLibrary, publish, setActive, guardRef, previewOpen, setPreviewOpen, previewHost, setPreviewAvailable } = useLibrary();
   const [data, setData] = useState<ProjectContent | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
   const [selected, setSelected] = useState<Text | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [mode, setMode] = useState<"write" | "preview">("write");
+  const [view, setView] = useState<"overview" | "text" | "book">(initialView === "overview" || initialView === "book" ? initialView : "text");
+  const [book, setBook] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
@@ -24,6 +29,10 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const order = useRef<number[]>([]);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const dirty = selected ? title !== selected.title || body !== selected.markdown : Boolean(title || body);
+  const canPreview = Boolean(data) && view === "text";
+
+  useEffect(() => { setPreviewAvailable(canPreview); }, [canPreview, setPreviewAvailable]);
+  useEffect(() => () => setPreviewAvailable(false), [setPreviewAvailable]);
 
   function choose(text: Text | null) {
     setSelected(text); setTitle(text?.title ?? ""); setBody(text?.markdown ?? ""); setNotice("");
@@ -31,15 +40,42 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   function canLeave() { return !pending && (!dirty || window.confirm("Há alterações não salvas. Descartar essas alterações?")); }
 
   useEffect(() => {
+    if (data) publish(data);
+  }, [data, publish]);
+  useEffect(() => {
+    setActive({ project: Number(projectId), text: view === "text" ? selected?.id ?? null : null });
+    return () => setActive(null);
+  }, [projectId, selected?.id, view, setActive]);
+  useEffect(() => {
+    guardRef.current = canLeave;
+    return () => { guardRef.current = null; };
+  });
+
+  useEffect(() => {
     let active = true;
-    Promise.all([libraryRequest<ProjectContent>(`projects/${projectId}/content`), libraryRequest<Project[]>("projects"), libraryRequest<Collection[]>("collections")])
-      .then(([content, p, c]) => {
+    libraryRequest<ProjectContent>(`projects/${projectId}/content`)
+      .then((content) => {
         if (!active) return;
-        setData(content); setProjects(p); setCollections(c);
-        const first = content.texts.find((text) => text.parent === null) ?? null;
+        setData(content);
+        const first = content.texts.find((text) => text.id === initialTextId) ?? null;
         setSelected(first); setTitle(first?.title ?? ""); setBody(first?.markdown ?? "");
+        if (initialTextId && !first) { setError("Texto não encontrado neste projeto."); setView("overview"); }
       }).catch((reason) => { if (active) setError(errorMessage(reason)); });
+    if (initialTextId) {
+      void libraryRequest(`texts/${initialTextId}/open`, "POST").then(refreshLibrary).catch(() => {});
+    }
+    if (initialView === "book") {
+      void libraryRequest<{ markdown: string }>(`projects/${projectId}/markdown`).then((result) => { if (active) setBook(result.markdown); }).catch((reason) => { if (active) setError(errorMessage(reason)); });
+    }
     return () => { active = false; };
+  }, [projectId, initialTextId, initialView, refreshLibrary]);
+
+  useEffect(() => {
+    function reload() {
+      void libraryRequest<ProjectContent>(`projects/${projectId}/content`).then(setData).catch((reason) => setError(errorMessage(reason)));
+    }
+    window.addEventListener("logos:library-change", reload);
+    return () => window.removeEventListener("logos:library-change", reload);
   }, [projectId]);
 
   useEffect(() => {
@@ -72,6 +108,8 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
       setSelected(saved);
       const content = await libraryRequest<ProjectContent>(`projects/${projectId}/content`);
       setData(content); setNotice("Salvo");
+      await refreshLibrary();
+      if (!selected) router.replace(`/texts/${saved.id}`);
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setPending(false); }
   }
@@ -86,11 +124,13 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     if (action === "delete" && !window.confirm("Excluir este texto e suas variações?")) return;
     setPending(true); setError("");
     try {
-      if (action === "delete") { await libraryRequest(`texts/${selected.id}`, "DELETE"); await refresh(null); }
+      if (action === "delete") { await libraryRequest(`texts/${selected.id}`, "DELETE"); await refresh(null); router.push(data?.project.is_inbox ? "/" : `/projects/${projectId}`); }
       else {
         const result = await libraryRequest<Text>(`texts/${selected.id}${action === "duplicate" ? "/duplicate" : ""}`, action === "promote" ? "PATCH" : "POST", action === "promote" ? { parent: null } : undefined);
         await refresh(result.id);
+        router.push(`/texts/${result.id}`);
       }
+      await refreshLibrary();
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setPending(false); }
   }
@@ -101,8 +141,8 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     if (action === "delete" && !window.confirm(data.project.is_principal ? "Excluir o projeto, todas as versões e todos os textos?" : "Excluir esta versão e seus textos? A versão principal será preservada.")) return;
     setPending(true); setError("");
     try {
-      if (action === "delete") { await libraryRequest(`projects/${projectId}`, "DELETE"); router.push("/"); }
-      else { const project = await libraryRequest<Project>(`projects/${projectId}/${action}`, "POST"); router.push(`/projects/${project.id}`); }
+      if (action === "delete") { await libraryRequest(`projects/${projectId}`, "DELETE"); await refreshLibrary(); router.push("/"); }
+      else { const project = await libraryRequest<Project>(`projects/${projectId}/${action}`, "POST"); await refreshLibrary(); router.push(`/projects/${project.id}`); }
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setPending(false); }
   }
@@ -117,6 +157,7 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
         ...(!data?.project.is_inbox ? { collection: form.get("collection") ? Number(form.get("collection")) : null } : {}),
       });
       setData((current) => current && { ...current, project }); setProperties(false);
+      await refreshLibrary();
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setPending(false); }
   }
@@ -127,8 +168,11 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
     const destination = String(new FormData(event.currentTarget).get("project"));
     setPending(true); setError("");
     try {
-      const target = destination === "inbox" ? (await libraryRequest<Project>("projects/inbox", "POST")).id : Number(destination);
-      await libraryRequest(`texts/${selected.id}/move`, "POST", { project: target }); await refresh(null); setMoving(false);
+      const target = destination === "loose" ? (await libraryRequest<Project>("projects/inbox", "POST")).id : Number(destination);
+      await libraryRequest(`texts/${selected.id}/move`, "POST", { project: target });
+      await refreshLibrary(); setMoving(false);
+      window.dispatchEvent(new Event("logos:library-change"));
+      router.push(`/texts/${selected.id}`);
     }
     catch (reason) { setError(errorMessage(reason)); }
     finally { setPending(false); }
@@ -173,52 +217,76 @@ export function ProjectEditor({ projectId }: { projectId: string }) {
   const project = data.project;
   const primary = data.texts.filter((text) => text.parent === null);
 
+  const collection = collections.find((item) => item.id === project.collection);
+
+  function readBook() {
+    if (!canLeave()) return;
+    router.push(`/projects/${projectId}/read`);
+  }
+
+  async function copyBook() {
+    try { await copy((await libraryRequest<{ markdown: string }>(`projects/${projectId}/markdown`)).markdown); }
+    catch (reason) { setError(errorMessage(reason)); }
+  }
+
   return <div className="project-workspace">
-    <div className="project-heading"><div><Link href="/">← Biblioteca</Link>
-      <h1>{project.title}</h1>{project.subtitle && <p>{project.subtitle}</p>}</div>
-      <div className="button-row"><button className="secondary" onClick={async () => {
-        try { await copy((await libraryRequest<{ markdown: string }>(`projects/${projectId}/markdown`)).markdown); } catch (reason) { setError(errorMessage(reason)); }
-      }}>Copiar projeto</button><details className="action-menu"><summary aria-label="Opções do projeto">•••</summary><div>
-        <button onClick={() => setProperties(true)}>Editar projeto</button>
-        {!project.is_inbox && <><button disabled={pending} onClick={() => projectAction("duplicate")}>Duplicar projeto</button><button disabled={pending} onClick={() => projectAction("new-version")}>Nova versão principal</button><button className="danger" disabled={pending} onClick={() => projectAction("delete")}>Excluir {project.is_principal ? "projeto" : "versão"}</button></>}
-      </div></details></div>
+    <div className="workspace-path"><nav className="breadcrumbs" aria-label="Caminho">
+      <Link href="/">Biblioteca</Link>
+      {collection && <><span>/</span><Link href={`/?collection=${collection.id}`}>{collection.title}</Link></>}
+      {!project.is_inbox && <><span>/</span><Link href={`/projects/${project.id}`}>{project.title}</Link></>}
+      {view === "text" && <><span>/</span><span aria-current="page">{title || "Novo texto"}</span></>}
+      {view === "book" && <><span>/</span><span aria-current="page">Leitura</span></>}
+    </nav>
+    {!project.is_inbox && <details className="action-menu"><summary aria-label="Opções do projeto">•••</summary><div>
+      <button onClick={() => setProperties(true)}>Editar projeto</button>
+      <button disabled={pending} onClick={() => projectAction("duplicate")}>Duplicar projeto</button>
+      <button disabled={pending} onClick={() => projectAction("new-version")}>Nova versão principal</button>
+      <button className="danger" disabled={pending} onClick={() => projectAction("delete")}>Excluir {project.is_principal ? "projeto" : "versão"}</button>
+    </div></details>}
     </div>
     {!project.is_principal && <div className="version-banner">Versão secundária <button className="secondary" onClick={async () => {
       if (!canLeave() || !window.confirm("Restaurar esta versão como principal?")) return;
-      try { await libraryRequest(`projects/${projectId}/restore`, "POST"); await refresh(selected?.id ?? null); }
+      try { await libraryRequest(`projects/${projectId}/restore`, "POST"); await refresh(selected?.id ?? null); await refreshLibrary(); }
       catch (reason) { setError(errorMessage(reason)); }
     }}>Restaurar como principal</button></div>}
-    {error && <p role="alert">{error}</p>}
-    <div className="editor-layout"><aside className="text-outline"><div className="sidebar-heading"><span>Textos <small>{primary.length}</small></span><button aria-label="Adicionar texto" className="icon-button" disabled={pending} onClick={() => { if (canLeave()) { choose(null); setMode("write"); textarea.current?.focus(); } }}>+</button></div>
-      {primary.length === 0 && <p className="outline-empty">Adicione seu primeiro texto.</p>}
-      {primary.map((text, index) => <div key={text.id}>
-        <div data-text-id={text.id} className={`text-row ${selected?.id === text.id ? "selected" : ""}`}>
-          <button aria-label={`Reordenar ${text.title || `texto ${index + 1}`}`} title="Arraste para reordenar; use as setas do teclado quando focado" className="drag-handle" onPointerDown={(event) => beginDrag(event, text.id)} onPointerMove={dragOver} onPointerUp={finishDrag} onPointerCancel={finishDrag} onKeyDown={(event) => { if (["ArrowUp", "ArrowDown"].includes(event.key)) { event.preventDefault(); keyboardOrder(text.id, event.key === "ArrowUp" ? -1 : 1); } }}>⠿</button>
-          <button className="text-select" disabled={pending} onClick={() => { if (canLeave()) choose(text); }}><span className="text-number">{String(index + 1).padStart(2, "0")}</span><span>{text.title || "Sem título"}</span></button>
-        </div>
-        {data.texts.some((variation) => variation.parent === text.id) && <details className="variations" open={selected?.parent === text.id || undefined}><summary>Variações</summary>{data.texts.filter((variation) => variation.parent === text.id).map((variation) => <button className={`nav-button ${selected?.id === variation.id ? "active" : ""}`} key={variation.id} onClick={() => { if (canLeave()) choose(variation); }}>{variation.title || "Sem título"}</button>)}</details>}
-      </div>)}
-      {data.versions.length > 1 && <details className="project-versions"><summary>Versões do projeto</summary>{data.versions.map((version) => <Link className="version-link" key={version.id} href={`/projects/${version.id}`}>
-        {version.is_principal ? "● " : "○ "}{version.title}<small>{version.is_principal ? "Principal" : `${version.text_count} textos`}</small>
-      </Link>)}</details>}
-    </aside>
-    <section className="text-editor"><div className="editor-toolbar"><div className="editor-tabs"><button className={mode === "write" ? "active" : ""} onClick={() => setMode("write")}>Escrever</button><button className={mode === "preview" ? "active" : ""} onClick={() => setMode("preview")}>Preview</button></div>
-      <div className="button-row"><span className="save-status" role="status">{pending ? "Salvando…" : dirty ? "Alterações não salvas" : notice}</span><button onClick={save} disabled={pending}>Salvar</button></div></div>
-      <div className="editor-paper"><input aria-label="Título do texto" className="text-title" placeholder="Título do texto" value={title} onChange={(event) => setTitle(event.target.value)} disabled={pending} />
-        {selected?.parent && <span className="variation-label">Variação</span>}
-        {mode === "write" ? <textarea ref={textarea} aria-label="Conteúdo Markdown" value={body} onChange={(event) => setBody(event.target.value)} placeholder="Escreva ou cole seu Markdown aqui…" disabled={pending} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "s") { event.preventDefault(); save(); } }} /> : <Markdown content={body || "*Seu texto aparecerá aqui.*"} />}
+    {error && !properties && !moving && <p role="alert">{error}</p>}
+    {view === "overview" && <section className="project-overview">
+      <div className="overview-heading"><div className="overview-cover" aria-hidden="true">¶</div><div className="overview-description"><span className="eyebrow">Projeto</span><h1>{project.is_inbox ? "Textos soltos" : project.title}</h1>{project.subtitle && <p>{project.subtitle}</p>}{project.author && <p>{project.author}</p>}<p>{primary.length} {primary.length === 1 ? "texto" : "textos"}</p><div className="button-row"><button className="secondary" onClick={readBook} disabled={!primary.length}>Ler livro</button><button className="secondary" onClick={copyBook}>Copiar livro</button><button className="text-action" onClick={() => setProperties(true)}>Editar informações</button></div></div></div>
+      <section className="overview-chapters"><div className="overview-section-heading"><h2>Sumário</h2><Link className="button-link" href={`/projects/${project.id}/new`}>+ Adicionar texto</Link></div>
+        {primary.length === 0 && <p className="outline-empty">Adicione seu primeiro texto para começar.</p>}
+        {primary.map((text, index) => <div data-text-id={text.id} className="overview-chapter" key={text.id}>
+          <button aria-label={`Reordenar ${text.title || `texto ${index + 1}`}`} title="Arraste para reordenar; use as setas do teclado quando focado" className="drag-handle" onPointerDown={(event) => beginDrag(event, text.id)} onPointerMove={dragOver} onPointerUp={finishDrag} onPointerCancel={finishDrag} onKeyDown={(event) => { if (["ArrowUp", "ArrowDown"].includes(event.key)) { event.preventDefault(); void keyboardOrder(text.id, event.key === "ArrowUp" ? -1 : 1); } }}>⠿</button>
+          <span className="text-number">{String(index + 1).padStart(2, "0")}</span><Link href={`/texts/${text.id}`}>{text.title || "Sem título"}</Link><small>{text.markdown.trim() ? text.markdown.trim().split(/\s+/).length : 0} palavras</small>
+        </div>)}
+      </section>
+      {data.versions.length > 1 && <details className="project-versions"><summary>Versões do projeto</summary>{data.versions.map((version) => <Link className="version-link" key={version.id} href={`/projects/${version.id}`}>{version.is_principal ? "● " : "○ "}{version.title}<small>{version.is_principal ? "Principal" : `${version.text_count} textos`}</small></Link>)}</details>}
+      {notice && <p role="status">{notice}</p>}
+    </section>}
+    {view === "book" && <section className="text-editor book-reader"><div className="editor-toolbar"><span>Leitura do livro</span><button className="text-action" disabled={!book} onClick={() => copy(book)}>Copiar livro</button></div><article className="editor-paper">{book ? <Markdown content={book} /> : !error && <p>Carregando leitura…</p>}</article></section>}
+    {view === "text" && <section className="text-editor"><div className="editor-toolbar"><div className="editor-heading-controls">
+      <input aria-label="Título do texto" className="editor-title" placeholder="Título do texto" value={title} onChange={(event) => setTitle(event.target.value)} disabled={pending} />
       </div>
-      <div className="editor-footer"><span>{body.trim() ? body.trim().split(/\s+/).length : 0} palavras</span><div className="button-row"><button className="text-action" onClick={() => copy(body)}>Copiar Markdown</button>{selected && <details className="action-menu"><summary aria-label="Opções do texto">•••</summary><div><button disabled={pending} onClick={() => textAction("duplicate")}>Duplicar como variação</button>{selected.parent && <button disabled={pending} onClick={() => textAction("promote")}>Mover para lista principal</button>}<button disabled={pending} onClick={() => setMoving(true)}>Mover para outro projeto</button><button className="danger" disabled={pending} onClick={() => textAction("delete")}>Excluir texto</button></div></details>}</div></div>
-    </section></div>
+      <div className="editor-actions"><span className="save-status" role="status">{pending ? "Salvando…" : dirty ? "Alterações não salvas" : notice}</span><button className="quiet-icon-button" aria-label="Copiar Markdown" title="Copiar Markdown" onClick={() => copy(body)}><CopyIcon /></button><button className="quiet-icon-button" aria-label={previewOpen ? "Ocultar preview" : "Mostrar preview"} title={previewOpen ? "Ocultar preview" : "Mostrar preview"} aria-expanded={previewOpen} aria-controls="text-preview" onClick={() => setPreviewOpen(!previewOpen)}><SidebarIcon side="right" /></button><span className="editor-action-divider" aria-hidden="true" /><button className="quiet-icon-button" aria-label="Salvar" title="Salvar" onClick={save} disabled={pending}><SaveIcon /></button></div></div>
+      <div className="editor-paper">
+          {selected?.parent && <span className="variation-label">Variação</span>}
+          <div className="editor-content">
+            <textarea ref={textarea} aria-label="Conteúdo Markdown" value={body} onChange={(event) => setBody(event.target.value)} placeholder="Escreva ou cole seu Markdown aqui…" disabled={pending} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "s") { event.preventDefault(); void save(); } }} />
+          </div>
+      </div>
+      <div className="editor-footer"><span>{body.trim() ? body.trim().split(/\s+/).length : 0} palavras</span><div className="button-row">{selected && <details className="action-menu"><summary aria-label="Opções do texto">•••</summary><div><button disabled={pending} onClick={() => textAction("duplicate")}>Duplicar como variação</button>{selected.parent && <button disabled={pending} onClick={() => textAction("promote")}>Mover para lista principal</button>}<button disabled={pending} onClick={() => setMoving(true)}>{project.is_inbox ? "Adicionar ao projeto…" : "Mover para…"}</button><button className="danger" disabled={pending} onClick={() => textAction("delete")}>Excluir texto</button></div></details>}</div></div>
+    </section>}
+    {canPreview && previewOpen && previewHost && createPortal(<><span className="preview-label">Preview ao vivo</span><Markdown content={body || "*Seu texto aparecerá aqui.*"} /></>, previewHost)}
     {properties && <div className="modal-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="properties-heading"><h2 id="properties-heading">Editar projeto</h2><form className="form-stack" onSubmit={saveProperties}>
+      {error && <p role="alert">{error}</p>}
       <label htmlFor="project-title">Título</label><input id="project-title" name="title" defaultValue={project.title} />
       <label htmlFor="project-subtitle">Subtítulo</label><input id="project-subtitle" name="subtitle" defaultValue={project.subtitle} />
       {!project.is_inbox && <><label htmlFor="collection">Coleção</label><select id="collection" name="collection" defaultValue={project.collection ?? ""}><option value="">Sem coleção</option>{collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}</select></>}
       <label htmlFor="project-author">Autor (opcional)</label><input id="project-author" name="author" defaultValue={project.author} />
       <div className="button-row"><button type="button" className="secondary" onClick={() => setProperties(false)}>Cancelar</button><button disabled={pending}>Salvar</button></div>
     </form></section></div>}
-    {moving && <div className="modal-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="move-heading"><h2 id="move-heading">Mover texto</h2><form className="form-stack" onSubmit={move}>
-      <label htmlFor="move-project">Projeto de destino</label><select id="move-project" name="project" required><option value="">Escolha um projeto</option>{!project.is_inbox && <option value="inbox">Caixa de entrada</option>}{projects.filter((p) => p.id !== project.id).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select>
+    {moving && <div className="modal-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="move-heading"><h2 id="move-heading">{project.is_inbox ? "Adicionar ao projeto" : "Mover texto"}</h2><form className="form-stack" onSubmit={move}>
+      {error && <p role="alert">{error}</p>}
+      <label htmlFor="move-project">Projeto de destino</label><select id="move-project" name="project" required><option value="">Escolha um projeto</option>{!project.is_inbox && <option value="loose">Deixar como texto solto</option>}{projects.filter((p) => p.id !== project.id).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select>
       <div className="button-row"><button type="button" className="secondary" onClick={() => setMoving(false)}>Cancelar</button><button disabled={pending}>Mover</button></div>
     </form></section></div>}
   </div>;

@@ -10,6 +10,16 @@ class Section:
     title: str
     markdown: str
 
+    def content(self) -> str:
+        body = self.markdown.strip()
+        first = body.splitlines()[0] if body else ""
+        heading = re.sub(r"^#{1,6}\s+", "", first).strip().rstrip("#").strip()
+        if self.title and not (
+            first.startswith("#") and heading.casefold() == self.title.casefold()
+        ):
+            body = f"## {self.title}\n\n{body}".rstrip()
+        return body
+
 
 @dataclass(frozen=True)
 class Manuscript:
@@ -23,12 +33,5 @@ class Manuscript:
             introduction += f"\n\n{self.subtitle}"
         parts = [introduction]
         for section in self.sections:
-            body = section.markdown.strip()
-            first = body.splitlines()[0] if body else ""
-            heading = re.sub(r"^#{1,6}\s+", "", first).strip().rstrip("#").strip()
-            if section.title and not (
-                first.startswith("#") and heading.casefold() == section.title.casefold()
-            ):
-                body = f"## {section.title}\n\n{body}".rstrip()
-            parts.append(body)
+            parts.append(section.content())
         return "\n\n".join(parts).rstrip() + "\n"

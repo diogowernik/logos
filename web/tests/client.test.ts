@@ -26,5 +26,31 @@ it("handles empty success, download and structured errors", async () => {
   fetchMock.mockResolvedValue(new Response("contents"));
   expect(await (await downloadRequest("/api/example")).text()).toBe("contents");
   fetchMock.mockResolvedValue(Response.json({ detail: "Session expired" }, { status: 401 }));
-  await expect(apiRequest("/api/example")).rejects.toEqual(new ApiError("Session expired", 401));
+  await expect(apiRequest("/api/example")).rejects.toMatchObject(new ApiError("Session expired", 401));
+});
+
+it("explains DRF field validation with labels supplied by the product", async () => {
+  fetchMock.mockResolvedValue(Response.json({ title: ["Este campo é obrigatório."], subtitle: ["Máximo de 500 caracteres."] }, { status: 400 }));
+  await expect(apiRequest("/api/example", undefined, { title: "Título", subtitle: "Subtítulo" }))
+    .rejects.toMatchObject(new ApiError("Título: Este campo é obrigatório. Subtítulo: Máximo de 500 caracteres.", 400, {
+      title: ["Este campo é obrigatório."], subtitle: ["Máximo de 500 caracteres."],
+    }));
+});
+
+it("preserves general validation errors without a technical field label", async () => {
+  fetchMock.mockResolvedValue(Response.json({ non_field_errors: ["Os valores são incompatíveis."] }, { status: 400 }));
+  await expect(apiRequest("/api/example")).rejects.toMatchObject(new ApiError("Os valores são incompatíveis.", 400));
+});
+
+it("handles nested validation errors and retains the original field paths", async () => {
+  fetchMock.mockResolvedValue(Response.json({ profile: { name: ["Informe o nome."] } }, { status: 400 }));
+  await expect(apiRequest("/api/example", undefined, { "profile.name": "Nome" }))
+    .rejects.toMatchObject(new ApiError("Nome: Informe o nome.", 400, { "profile.name": ["Informe o nome."] }));
+});
+
+it("uses a readable fallback for non-JSON or empty error responses, including downloads", async () => {
+  fetchMock.mockResolvedValue(new Response("<html>upstream error</html>", { status: 502 }));
+  await expect(downloadRequest("/api/example")).rejects.toMatchObject(new ApiError("Não foi possível concluir a solicitação.", 502));
+  fetchMock.mockResolvedValue(Response.json({}, { status: 500 }));
+  await expect(apiRequest("/api/example")).rejects.toMatchObject(new ApiError("Não foi possível concluir a solicitação.", 500));
 });

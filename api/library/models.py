@@ -47,6 +47,7 @@ class Text(models.Model):
     title = models.CharField(max_length=250, blank=True)
     markdown = models.TextField(blank=True)
     position = models.PositiveIntegerField(default=0)
+    last_used_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["position", "id"]

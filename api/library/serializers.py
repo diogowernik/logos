@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Collection, Project, Text
+from .compilation import Section
 from .services import create_project, next_position
 
 
@@ -11,10 +12,15 @@ class CollectionSerializer(serializers.ModelSerializer):
 
 
 class TextSerializer(serializers.ModelSerializer):
+    compiled_markdown = serializers.SerializerMethodField()
+
     class Meta:
         model = Text
-        fields = ["id", "project", "parent", "title", "markdown", "position"]
-        read_only_fields = ["position"]
+        fields = ["id", "project", "parent", "title", "markdown", "position", "last_used_at", "compiled_markdown"]
+        read_only_fields = ["position", "last_used_at"]
+
+    def get_compiled_markdown(self, obj):
+        return Section(obj.pk, obj.title, obj.markdown).content()
 
     def validate(self, data):
         project = data.get("project", self.instance.project if self.instance else None)
@@ -45,6 +51,15 @@ class TextSerializer(serializers.ModelSerializer):
         if instance.parent_id and "parent" in validated_data and validated_data["parent"] is None:
             validated_data["position"] = next_position(instance.project.texts.filter(parent=None))
         return super().update(instance, validated_data)
+
+
+class TextListSerializer(serializers.ModelSerializer):
+    project_title = serializers.CharField(source="project.title", read_only=True)
+    is_loose = serializers.BooleanField(source="project.family.is_inbox", read_only=True)
+
+    class Meta:
+        model = Text
+        fields = ["id", "project", "parent", "title", "position", "last_used_at", "project_title", "is_loose"]
 
 
 class ProjectSerializer(serializers.ModelSerializer):

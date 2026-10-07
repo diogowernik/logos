@@ -127,11 +127,39 @@ O Logos novo pode redesenhar sua experiência com liberdade. Comportamentos úte
 do legado serão aproveitados quando não houver uma alternativa melhor; não há
 exigência de fidelidade às telas antigas como na reconstrução do Holding.
 
-## Caixa de entrada
+## Novo texto e navegação
 
-Lugar simples para guardar textos e ideias antes de saber a qual Project
-pertencem. Depois é possível movê-los para um Project. Na implementação, pode
-ser um Project reservado do usuário.
+`Novo texto`, com lápis, é o primeiro item da lateral. Abre a escrita sem exigir
+Project. Textos soltos podem depois ser adicionados a um Project pelo menu ou
+arrastando um recente para o Project. Recentes mostra os textos utilizados por
+último, associados ou não a Projects; não é uma pasta. Textos antigos continuam
+acessíveis na biblioteca e busca. Não há uma Caixa de entrada na interface.
+
+A lateral acompanha biblioteca, Project e Text: Novo texto, buscar, biblioteca,
+Collections, Projects e recentes. Clicar no nome do Project abre sua visão geral;
+clicar num Text abre a escrita. A visão geral não aparece como capítulo fixo e
+não entra na compilação. Ela reúne sumário ordenável, informações, versões e
+ações do livro. Capas e geração de EPUB pertencem à etapa de publicação.
+
+O caminho clicável `Biblioteca / Collection / Project / Text` substitui a volta
+isolada e títulos repetidos. Collection aparece somente quando existir.
+Escrita permite mostrar ou esconder o preview lateral à direita. Título é um
+campo discreto na barra; copiar, preview e salvar são controles por ícone.
+Não há abas Escrever/Ler no editor. A lateral pode ser recolhida.
+
+Prioridade atual: experiência de trabalho, edição e limpeza de ebooks para uso
+pessoal. A experiência completa de leitura será tratada em outro momento; o
+preview atende à revisão durante a escrita. A leitura básica de Project já
+disponível não precisa crescer junto com a oficina.
+
+Livros e Collections usam cartões na biblioteca, preparados para receber capas.
+
+A lateral segue as referências fornecidas do GPT: mesma escala de texto,
+peso normal, cores neutras suaves, ícones SVG de 20px e linhas alinhadas.
+Projects usam pasta; no hover/foco aparece o lápis para adicionar um Text e o
+menu contextual. Em dispositivos sem hover, as ações permanecem visíveis.
+Os padrões do Holding serão considerados depois, preservando este formato de
+navegação. O estilo da lateral vive em `sidebar.css`, junto de seu componente.
 
 ## Ações principais
 

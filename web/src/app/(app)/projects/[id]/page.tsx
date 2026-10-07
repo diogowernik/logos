@@ -3,5 +3,5 @@ import { ProjectEditor } from "@/features/library/ProjectEditor";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   await requireUser();
-  return <ProjectEditor projectId={(await params).id} />;
+  return <ProjectEditor key={(await params).id} projectId={(await params).id} />;
 }

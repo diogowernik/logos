@@ -1,5 +1,12 @@
 # Roadmap
 
+## Prioridade atual
+
+O foco é a oficina pessoal: trabalho, edição de Markdown e importação/limpeza de
+ebooks. A página de edição chegou a uma base aprovada, intuitiva e econômica em
+controles. Próximas melhorias devem partir do uso real. A experiência completa
+de leitura fica para outra etapa; o preview é uma ferramenta de edição.
+
 ## 1. Fundação
 
 Concluída: app gerado, dependências e ambientes preparados, banco migrado e
@@ -12,8 +19,8 @@ Saída: aplicação vazia executável.
 
 ## 2. Biblioteca e editor
 
-Primeira rodada implementada: biblioteca, Collections, Projects, Texts, Caixa de
-entrada, versões, variações, editor Markdown com preview, busca em títulos e
+Primeira rodada implementada: biblioteca, Collections, Projects, Texts soltos,
+versões, variações, editor Markdown com preview, busca em títulos e
 conteúdo, copy, movimentação e reordenação direta. A migração inicial do domínio
 foi aplicada ao banco local.
 
@@ -25,7 +32,7 @@ Imagens já podem ser exibidas no preview por URLs em Markdown.
 - variações com um nível;
 - versão principal e versões secundárias de Project;
 - ação transacional para criar nova versão principal;
-- Caixa de entrada;
+- Novo texto sem Project obrigatório, recentes e textos soltos;
 - criar pelo botão `+`, editar e salvar;
 - reordenar diretamente por arrastar;
 - mover e duplicar;
@@ -35,6 +42,11 @@ Imagens já podem ser exibidas no preview por URLs em Markdown.
 Saída: `+ -> escrever/colar -> salvar` funciona sem metadata obrigatória.
 
 ## 3. Reader e compilação
+
+Compilação comum e leitura básica do Project já implementadas. Os botões
+Escrever/Ler do editor foram removidos; ele permanece dedicado à escrita com
+preview lateral. A evolução do reader e do progresso de leitura fica para outra
+etapa, depois da experiência de trabalho e limpeza de ebooks.
 
 - compilação comum;
 - normalização de títulos duplicados;
@@ -75,3 +87,21 @@ IA integrada, histórico automático de revisões ou taxonomia avançada.
 Quando o volume da biblioteca justificar, adicionar uma aba opcional de Pastas
 e subpastas para organizar Collections, Projects e textos soltos. Pastas não
 alteram compilação, reader ou EPUB.
+
+## Próxima rodada de interface
+
+Primeiro ajuste concluído no Logos: barra azul `#1976d2`, logo Wtree branca,
+largura total, navegação com seleção arredondada, posição fixa durante a rolagem
+e alturas de 64px no desktop e 56px no mobile. Referências: Logos legado e Holding.
+
+A versão neutra para o App Creator será feita em uma rodada separada.
+
+Rodada de navegação implementada: lateral compartilhada e recolhível com Novo
+texto, biblioteca, Projects expansíveis, Collections e recentes. A busca fica
+na biblioteca. Texto
+solto pode ser adicionado a Project pelo menu ou arrastando um recente.
+Project abre na visão geral, com sumário ordenável, informações, versões, copy e
+leitura completa; capítulos abrem diretamente. Caminho clicável compacto,
+preview lateral opcional à direita. Cartões de Projects e
+Collections preservados; upload de capas e geração de EPUB seguem nas etapas
+de imagens e publicação.

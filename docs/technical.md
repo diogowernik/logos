@@ -63,6 +63,12 @@ referência à versão principal. Cada `Project` guarda seus próprios dados e
 Texts. A família não aparece como entidade na interface. Criação e troca da
 principal são transacionais; mover um Project de Collection move sua família.
 
+Textos soltos usam por enquanto um Project reservado (`is_inbox`) como detalhe
+interno, sem pasta ou nome na interface. A navegação permite texto independente
+e destino explícito posteriormente, preservando dados já existentes.
+`Text.last_used_at` registra salvamentos e aberturas para ordenar recentes;
+listagens e buscas privadas não carregam todos os corpos Markdown.
+
 ## Compilação
 
 Um DTO puro, independente do ORM, reúne metadata, Texts principais ordenados e

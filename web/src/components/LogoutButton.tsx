@@ -17,7 +17,7 @@ export function LogoutButton() {
     } catch { setError(true); }
     finally { setPending(false); }
   }
-  return <div>{error && <span role="alert">Não foi possível sair. </span>}
+  return <div className="session-actions">{error && <span role="alert">Não foi possível sair. </span>}
     <button className="secondary" onClick={logout} disabled={pending}>{pending ? "Saindo…" : "Sair"}</button>
   </div>;
 }

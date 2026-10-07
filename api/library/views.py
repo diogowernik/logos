@@ -1,13 +1,14 @@
 from django.db import transaction
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import Collection, Project, ProjectFamily, Text
-from .serializers import CollectionSerializer, ProjectSerializer, TextSerializer
+from .serializers import CollectionSerializer, ProjectSerializer, TextSerializer, TextListSerializer
 from .services import (
     compile_project,
     create_project,
@@ -127,10 +128,33 @@ class ProjectViewSet(viewsets.ModelViewSet):
 class TextViewSet(viewsets.ModelViewSet):
     serializer_class = TextSerializer
 
+    def get_serializer_class(self):
+        return TextListSerializer if self.action in ("list", "recent") else TextSerializer
+
     def get_queryset(self):
-        return Text.objects.filter(project__family__owner=self.request.user).select_related(
+        queryset = Text.objects.filter(project__family__owner=self.request.user).select_related(
             "project__family", "parent"
         )
+        if self.action in ("list", "recent"):
+            queryset = queryset.filter(parent=None, project_id=F("project__family__principal_id"))
+            if self.request.query_params.get("loose") == "1":
+                queryset = queryset.filter(project__family__is_inbox=True)
+            search = self.request.query_params.get("search", "").strip()
+            if search:
+                queryset = queryset.filter(Q(title__icontains=search) | Q(markdown__icontains=search))
+            queryset = queryset.order_by("-last_used_at", "-id").defer("markdown")
+        return queryset
+
+    @action(detail=False, methods=["get"])
+    def recent(self, request):
+        return Response(self.get_serializer(self.get_queryset()[:12], many=True).data)
+
+    @action(detail=True, methods=["post"])
+    def open(self, request, pk=None):
+        text = self.get_object()
+        text.last_used_at = timezone.now()
+        text.save(update_fields=["last_used_at"])
+        return Response(self.get_serializer(text).data)
 
     @action(detail=True, methods=["post"])
     def duplicate(self, request, pk=None):

@@ -24,6 +24,7 @@ import Breadcrumbs from "@mui/material/Breadcrumbs";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
+import { alpha } from "@mui/material/styles";
 import { HeaderActions } from "@/components/ui/HeaderControls";
 import { DataSection } from "@/components/ui/DataSection";
 
@@ -259,19 +260,19 @@ export function Library({
                             />
                             <Box
                               aria-hidden="true"
-                              sx={{
+                              sx={(theme) => ({
                                 height: 150,
                                 display: "grid",
                                 placeItems: "center",
-                                bgcolor: "action.hover",
+                                bgcolor: alpha(theme.palette.primary.main, 0.08),
                                 fontSize: 44,
-                                color: "text.secondary",
+                                color: "primary.main",
                                 "& img": {
                                   width: "100%",
                                   height: "100%",
                                   objectFit: "contain",
                                 },
-                              }}
+                              })}
                             >
                               {project.cover_url ? (
                                 <PrivateImage src={project.cover_url} alt="" />

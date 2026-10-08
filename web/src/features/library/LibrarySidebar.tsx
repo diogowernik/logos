@@ -28,6 +28,7 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
 import { ActionMenu } from "@/components/ui/ActionMenu";
+import { SidebarRow, SidebarRowActions } from "@/theme/workspace";
 
 const textDragType = "application/x-logos-text";
 
@@ -123,21 +124,9 @@ export function LibrarySidebar() {
             const content = library.contents[project.id];
             return (
               <Box key={project.id}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    borderRadius: 2,
-                    position: "relative",
-                    "&:hover .sidebar-row-actions, &:focus-within .sidebar-row-actions":
-                      { opacity: 1 },
-                    bgcolor:
-                      dropTarget === project.id
-                        ? "action.selected"
-                        : library.active?.project === project.id
-                          ? "action.hover"
-                          : undefined,
-                  }}
+                <SidebarRow
+                  active={library.active?.project === project.id}
+                  dropTarget={dropTarget === project.id}
                   onDragOver={(event) => {
                     if (event.dataTransfer.types.includes(textDragType)) {
                       event.preventDefault();
@@ -179,21 +168,7 @@ export function LibrarySidebar() {
                   >
                     <ListItemText primary={project.title} />
                   </ListItemButton>
-                  <Box
-                    className="sidebar-row-actions"
-                    sx={{
-                      position: "absolute",
-                      right: 0,
-                      display: "flex",
-                      bgcolor: "background.default",
-                      borderRadius: 2,
-                      opacity: 0,
-                      "@media (hover: none)": {
-                        position: "static",
-                        opacity: 1,
-                      },
-                    }}
-                  >
+                  <SidebarRowActions className="sidebar-row-actions">
                     <ActionMenu label={`Opções do projeto ${project.title}`}>
                       <MenuItem
                         component={Link}
@@ -215,8 +190,8 @@ export function LibrarySidebar() {
                     >
                       <ComposeIcon />
                     </IconButton>
-                  </Box>
-                </Box>
+                  </SidebarRowActions>
+                </SidebarRow>
                 <Collapse in={Boolean(open)}>
                   <Box sx={{ pl: 3 }}>
                     {content ? (
@@ -316,8 +291,7 @@ export function LibrarySidebar() {
       <Collapse in={recentOpen}>
         <Box id="sidebar-recents">
           {library.recent.map((text) => (
-            <Box
-              sx={{ display: "flex", alignItems: "center" }}
+            <SidebarRow
               key={text.id}
               draggable={!pending}
               onDragStart={(event) => {
@@ -334,20 +308,22 @@ export function LibrarySidebar() {
               >
                 <ListItemText primary={text.title || "Sem título"} />
               </ListItemButton>
-              <ActionMenu
-                label={`Opções de ${text.title || "texto sem título"}`}
-              >
-                <MenuItem
-                  disabled={pending}
-                  onClick={() => {
-                    setError("");
-                    setMoving(text);
-                  }}
+              <SidebarRowActions className="sidebar-row-actions">
+                <ActionMenu
+                  label={`Opções de ${text.title || "texto sem título"}`}
                 >
-                  {text.is_loose ? "Adicionar ao projeto…" : "Mover para…"}
-                </MenuItem>
-              </ActionMenu>
-            </Box>
+                  <MenuItem
+                    disabled={pending}
+                    onClick={() => {
+                      setError("");
+                      setMoving(text);
+                    }}
+                  >
+                    {text.is_loose ? "Adicionar ao projeto…" : "Mover para…"}
+                  </MenuItem>
+                </ActionMenu>
+              </SidebarRowActions>
+            </SidebarRow>
           ))}
         </Box>
       </Collapse>

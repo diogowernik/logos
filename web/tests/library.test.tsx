@@ -123,7 +123,9 @@ it("keeps the draft on failure and toggles preview without losing edits", async 
   await user.click(
     screen.getAllByRole("button", { name: "Ocultar preview" })[1],
   );
-  expect(screen.queryByText("Preview ao vivo")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("article", { name: "Texto renderizado" }),
+  ).not.toBeInTheDocument();
   await user.click(
     screen.getAllByRole("button", { name: "Mostrar preview" })[0],
   );
@@ -245,13 +247,17 @@ it("opens the right panel empty in the library and removes the editor preview on
       <ProjectEditor projectId="1" initialView="text" initialTextId={2} />
     </LibraryShell>,
   );
-  expect(await screen.findByText("Preview ao vivo")).toBeVisible();
+  expect(
+    await screen.findByRole("article", { name: "Texto renderizado" }),
+  ).toBeVisible();
   view.rerender(
     <LibraryShell>
       <Library />
     </LibraryShell>,
   );
-  expect(screen.queryByText("Preview ao vivo")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("article", { name: "Texto renderizado" }),
+  ).not.toBeInTheDocument();
   expect(screen.getByRole("complementary", { name: "Preview" })).toBeVisible();
   expect(
     screen.getByRole("button", { name: "Ocultar preview" }),

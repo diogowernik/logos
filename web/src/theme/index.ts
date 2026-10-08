@@ -26,7 +26,11 @@ export function createAppTheme(identity: AppIdentity) {
         sidebar: "#f7f8f8",
         reading: "#ffffff",
       },
-      layout: { leftWidth: 260, rightWidth: 360 },
+      layout: {
+        leftWidth: 260,
+        rightWidth: "clamp(320px, 38vw, 720px)",
+        rightOverlayWidth: 560,
+      },
     },
     shape: { borderRadius: 4 },
     typography: {

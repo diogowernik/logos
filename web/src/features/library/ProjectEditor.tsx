@@ -17,14 +17,10 @@ import Stack from "@mui/material/Stack";
 import Card from "@mui/material/Card";
 import CardHeader from "@mui/material/CardHeader";
 import CardContent from "@mui/material/CardContent";
-import CardActions from "@mui/material/CardActions";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
-import InputBase from "@mui/material/InputBase";
-import Paper from "@mui/material/Paper";
 import Alert from "@mui/material/Alert";
-import Breadcrumbs from "@mui/material/Breadcrumbs";
 import MenuItem from "@mui/material/MenuItem";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
@@ -39,8 +35,22 @@ import {
   HeaderActions,
   CompactActionButton,
 } from "@/components/ui/HeaderControls";
-import { ActionMenu } from "@/components/ui/ActionMenu";
+import { ActionMenu, DestructiveMenuItem } from "@/components/ui/ActionMenu";
 import { useShell } from "@/components/shell/AppShell";
+import {
+  WorkspacePath,
+  WorkspaceBreadcrumbs,
+  EditorPaper,
+  EditorHeader,
+  EditorTitle,
+  EditorBody,
+  MarkdownInput,
+  EditorFooter,
+  EditorWordCount,
+  EditorStatus,
+  EditorWorkspace,
+  PreviewDocument,
+} from "@/theme/workspace";
 
 export function ProjectEditor({
   projectId,
@@ -112,12 +122,9 @@ export function ProjectEditor({
   const collection = collections.find((item) => item.id === project.collection);
 
   return (
-    <Stack spacing={2}>
-      <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, gap: 1 }}>
-        <Breadcrumbs
-          aria-label="Caminho"
-          sx={{ flex: 1, overflowWrap: "anywhere" }}
-        >
+    <EditorWorkspace editing={view === "text"} spacing={2}>
+      <WorkspacePath>
+        <WorkspaceBreadcrumbs aria-label="Caminho">
           <Link href="/">Biblioteca</Link>
           {collection && (
             <Link href={`/?collection=${collection.id}`}>
@@ -133,7 +140,7 @@ export function ProjectEditor({
           {view === "book" && (
             <Typography aria-current="page">Leitura</Typography>
           )}
-        </Breadcrumbs>
+        </WorkspaceBreadcrumbs>
         {!project.is_inbox && (
           <ActionMenu label="Opções do projeto">
             <MenuItem onClick={() => setProperties(true)}>
@@ -151,16 +158,15 @@ export function ProjectEditor({
             >
               Nova versão principal
             </MenuItem>
-            <MenuItem
-              sx={{ color: "error.main" }}
+            <DestructiveMenuItem
               disabled={pending}
               onClick={() => projectAction("delete")}
             >
               Excluir {project.is_principal ? "projeto" : "versão"}
-            </MenuItem>
+            </DestructiveMenuItem>
           </ActionMenu>
         )}
-      </Box>
+      </WorkspacePath>
       {!project.is_principal && (
         <Alert
           severity="info"
@@ -359,30 +365,25 @@ export function ProjectEditor({
         </Card>
       )}
       {view === "text" && (
-        <Paper
+        <EditorPaper
           component="section"
           variant="outlined"
-          sx={(theme) => ({
-            bgcolor: theme.app.surfaces.reading,
-            overflow: "hidden",
-          })}
+          className="text-editor-paper"
         >
-          <CardHeader
+          <EditorHeader
             slotProps={{ title: { component: "h2", variant: "h6" } }}
             title={
-              <InputBase
+              <EditorTitle
                 inputProps={{ "aria-label": "Título do texto" }}
-                fullWidth
                 placeholder="Título do texto"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 disabled={pending}
-                sx={{ fontSize: 18, fontWeight: 500 }}
               />
             }
             action={
               <HeaderActions>
-                <Typography
+                <EditorStatus
                   variant="caption"
                   color="text.secondary"
                   role="status"
@@ -392,7 +393,7 @@ export function ProjectEditor({
                     : dirty
                       ? "Alterações não salvas"
                       : notice}
-                </Typography>
+                </EditorStatus>
                 <CompactActionButton
                   label="Copiar Markdown"
                   onClick={() => copy(body)}
@@ -421,21 +422,15 @@ export function ProjectEditor({
               </HeaderActions>
             }
           />
-          <Box
-            sx={{
-              p: { xs: 2, md: 3 },
-              maxWidth: 880,
-              mx: "auto",
-              minHeight: "55dvh",
-            }}
-          >
+          <EditorBody>
             {selected?.parent && (
               <Typography variant="caption" color="text.secondary">
                 Variação
               </Typography>
             )}
-            <InputBase
+            <MarkdownInput
               multiline
+              inputComponent="textarea"
               fullWidth
               inputRef={textarea}
               inputProps={{ "aria-label": "Conteúdo Markdown" }}
@@ -443,8 +438,6 @@ export function ProjectEditor({
               onChange={(event) => setBody(event.target.value)}
               placeholder="Escreva ou cole seu Markdown aqui…"
               disabled={pending}
-              minRows={16}
-              sx={{ fontSize: 16, lineHeight: 1.75, alignItems: "flex-start" }}
               onKeyDown={(event) => {
                 if ((event.metaKey || event.ctrlKey) && event.key === "s") {
                   event.preventDefault();
@@ -452,15 +445,11 @@ export function ProjectEditor({
                 }
               }}
             />
-          </Box>
-          <CardActions>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mr: "auto" }}
-            >
+          </EditorBody>
+          <EditorFooter>
+            <EditorWordCount variant="caption" color="text.secondary">
               {body.trim() ? body.trim().split(/\s+/).length : 0} palavras
-            </Typography>
+            </EditorWordCount>
             {selected && (
               <ActionMenu label="Opções do texto">
                 <MenuItem
@@ -480,32 +469,24 @@ export function ProjectEditor({
                 <MenuItem disabled={pending} onClick={() => setMoving(true)}>
                   {project.is_inbox ? "Adicionar ao projeto…" : "Mover para…"}
                 </MenuItem>
-                <MenuItem
-                  sx={{ color: "error.main" }}
+                <DestructiveMenuItem
                   disabled={pending}
                   onClick={() => textAction("delete")}
                 >
                   Excluir texto
-                </MenuItem>
+                </DestructiveMenuItem>
               </ActionMenu>
             )}
-          </CardActions>
-        </Paper>
+          </EditorFooter>
+        </EditorPaper>
       )}
       {canPreview &&
         previewOpen &&
         previewHost &&
         createPortal(
-          <>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", mb: 2 }}
-            >
-              Preview ao vivo
-            </Typography>
-            <Markdown content={body || "*Seu texto aparecerá aqui.*"} />
-          </>,
+          <PreviewDocument component="article" aria-label="Texto renderizado">
+            <Markdown content={body} />
+          </PreviewDocument>,
           previewHost,
         )}
       <Dialog
@@ -623,6 +604,6 @@ export function ProjectEditor({
           </DialogActions>
         </Box>
       </Dialog>
-    </Stack>
+    </EditorWorkspace>
   );
 }

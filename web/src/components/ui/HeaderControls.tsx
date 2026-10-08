@@ -12,15 +12,12 @@ export const HeaderTitleControls = styled(Box)(({ theme }) => ({
   columnGap: theme.spacing(3),
   rowGap: theme.spacing(1),
 }));
-export function HeaderActions({ children }: { children: ReactNode }) {
-  return (
-    <Box
-      sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1 }}
-    >
-      {children}
-    </Box>
-  );
-}
+export const HeaderActions = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: theme.spacing(1),
+}));
 export function CompactActionButton({
   label,
   children,

@@ -2,7 +2,12 @@
 import { useId, useState, type ReactNode } from "react";
 import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import { styled } from "@mui/material/styles";
 import { MoreIcon } from "@/components/icons/NavigationIcons";
+export const DestructiveMenuItem = styled(MenuItem)(({ theme }) => ({
+  color: theme.palette.error.main,
+}));
 export function ActionMenu({
   label,
   children,

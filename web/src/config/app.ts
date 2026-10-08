@@ -5,9 +5,9 @@ export const appConfig = {
     { label: "Biblioteca", href: "/", activePaths: ["/projects", "/texts"] },
   ],
   identity: {
-    primary: { main: "#4b555d", dark: "#30383e", light: "#77828a" },
-    header: "#4b555d",
+    primary: { main: "#2854a1", dark: "#1c3b71", light: "#5376b4" },
+    header: "#1976d2",
     headerText: "#ffffff",
-    cardTitle: "#394148",
+    cardTitle: "#2854a1",
   } satisfies AppIdentity,
 };

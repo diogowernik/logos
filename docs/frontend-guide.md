@@ -4,6 +4,11 @@ A base é MUI 9 + Emotion + Geist, integrada ao App Router do Next. Os controles
 são componentes MUI usados diretamente. As composições locais existem para
 agrupar responsabilidades reais, sem recriar uma biblioteca de controles.
 
+Logos preserva sua identidade azul: barra `#1976d2`, ações e títulos dos cards
+`#2854a1`, com capas provisórias em azul suave derivado de `primary`.
+Neutralidade se aplica às superfícies, à navegação e à área de escrita;
+não significa retirar a cor de identidade do app.
+
 ## Onde mudar cada padrão
 
 - `web/src/config/app.ts`: nome, navegação e identidade do app. `primary`
@@ -12,6 +17,8 @@ agrupar responsabilidades reais, sem recriar uma biblioteca de controles.
   larguras dos painéis. Erro usa a paleta laranja, preservando contraste.
 - `web/src/theme/components.ts`: defaults e overrides de Card, Paper,
   CardHeader, CardActions, botões, campos, listas, menus, diálogos e tabelas.
+- `web/src/theme/workspace.ts`: estilos compartilhados do shell, editor,
+  caminho, preview e ações laterais, definidos com `styled` do MUI.
 - `web/src/components/AppProviders.tsx`: ThemeProvider e CssBaseline.
 - `web/src/app/layout.tsx`: Geist/Geist Mono e cache SSR do MUI para Next 16.
 - `web/src/components/shell/AppShell.tsx`: painéis opcionais e conteúdo central.
@@ -39,6 +46,18 @@ ou leitura usa superfície branca, largura confortável e tipografia de 16px;
 a navegação usa 16px e peso normal. Não transforme a área de escrita em uma
 sucessão de cartões decorativos.
 
+O editor tem cabeçalho e rodapé brancos. Título editável, corpo, caminho,
+status e contagem compartilham a escala de 16px em
+`workspace.ts`. O corpo usa 16px de espaço acima do texto, sem padding extra
+no textarea nem coluna centralizada. Headings dentro do Markdown mantêm
+hierarquia própria; os títulos dos cards da biblioteca continuam em 18px.
+
+A oficina ocupa a altura disponível: caminho, cabeçalho e rodapé mantêm seu
+espaço, e o campo de escrita preenche o restante com rolagem interna para
+textos longos, sem mínimo fixo de linhas. O preview usa superfície branca,
+linhas de até 68ch e parágrafos com espaço moderado. Ele mostra apenas o
+documento; não precisa de rótulo explicativo nem mensagem no estado vazio.
+
 ## Painéis
 
 ```tsx
@@ -64,7 +83,9 @@ React ao alternar painéis e mudar de viewport; rascunhos não são remontados.
 O host do painel pode ser refeito ao trocar entre coluna e sobreposição,
 e o portal acompanha o novo host sem transferir estado do editor.
 
-A lateral esquerda mede 260px e a direita 360px. Desktop começa em 761px;
+A lateral esquerda mede 260px.
+O painel direito usa largura proporcional de 38vw, entre 320px e 720px;
+em sobreposição usa até 560px, limitado à viewport. Desktop começa em 761px;
 o direito abre por padrão a partir de 1280px e ocupa uma coluna a partir de
 1100px; abaixo disso usa sobreposição para preservar a área central.
 Em mobile, Drawer temporário cuida de backdrop, Escape, foco e retorno ao controle; um painel abre por vez.
@@ -76,8 +97,9 @@ rolam independentemente da área central. Resize por arrastar é evolução futu
 `globals.css` declara a ordem de layers do MUI. CSS adicional é restrito a
 conteúdo especializado, como Markdown. Não aplicar estilos globais a `button`,
 `input`, `h1` ou `p`; a aparência da interface pertence ao tema MUI.
-Geist Mono é reservado para código. Logos mantém o estilo do documento
-Markdown isolado da tipografia dos títulos da interface.
+Escrita, interface e leitura usam Geist Sans; Geist Mono fica nos trechos
+de código. Logos mantém o estilo do documento Markdown
+isolado da tipografia dos títulos da interface.
 
 Autenticação continua no servidor. Páginas privadas mantêm `requireUser()`;
 a camada visual cliente não recebe tokens. Não acrescentar React Query,

@@ -6,9 +6,28 @@ import { useState, type FormEvent } from "react";
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
 import type { TextSummary } from "./types";
-import { ChevronIcon, ComposeIcon, FolderIcon, LibraryIcon, MoreIcon } from "@/components/icons/NavigationIcons";
+import {
+  ComposeIcon,
+  FolderIcon,
+  LibraryIcon,
+} from "@/components/icons/NavigationIcons";
 import { SidebarSection } from "./SidebarSection";
-import "./sidebar.css";
+import Box from "@mui/material/Box";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemText from "@mui/material/ListItemText";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import IconButton from "@mui/material/IconButton";
+import MenuItem from "@mui/material/MenuItem";
+import Alert from "@mui/material/Alert";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
+import Button from "@mui/material/Button";
+import Collapse from "@mui/material/Collapse";
+import { ActionMenu } from "@/components/ui/ActionMenu";
 
 const textDragType = "application/x-logos-text";
 
@@ -26,8 +45,14 @@ export function LibrarySidebar() {
 
   async function moveText(text: TextSummary, project: number) {
     if (text.project === project || pending) return;
-    if (library.active?.text === text.id && library.guardRef.current && !library.guardRef.current()) return;
-    setPending(true); setError("");
+    if (
+      library.active?.text === text.id &&
+      library.guardRef.current &&
+      !library.guardRef.current()
+    )
+      return;
+    setPending(true);
+    setError("");
     try {
       await libraryRequest(`texts/${text.id}/move`, "POST", { project });
       await library.refresh();
@@ -36,72 +61,363 @@ export function LibrarySidebar() {
       window.dispatchEvent(new Event("logos:library-change"));
       setMoving(null);
       if (library.active?.text === text.id) router.push(`/texts/${text.id}`);
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setPending(false); }
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setPending(false);
+    }
   }
 
   function submitMove(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (moving) void moveText(moving, Number(new FormData(event.currentTarget).get("project")));
+    if (moving)
+      void moveText(
+        moving,
+        Number(new FormData(event.currentTarget).get("project")),
+      );
   }
 
-  return <aside id="library-sidebar" className="workspace-sidebar" aria-label="Navegação da biblioteca">
-    <Link className={`nav-button new-text ${pathname === "/texts/new" ? "active" : ""}`} href="/texts/new" onClick={(event) => {
-      if (pathname === "/texts/new") {
-        event.preventDefault();
-        if (!library.guardRef.current || library.guardRef.current()) window.dispatchEvent(new Event("logos:new-text"));
-      }
-    }}><ComposeIcon /><span className="sidebar-label">Novo texto</span></Link>
-    <Link className={`nav-button sidebar-primary ${pathname === "/" ? "active" : ""}`} href="/"><LibraryIcon /><span className="sidebar-label">Biblioteca</span></Link>
-    <SidebarSection title="Projetos" open={projectsOpen} controls="sidebar-projects" onToggle={() => setProjectsOpen(!projectsOpen)} createHref="/?create=project" createLabel="Criar projeto" />
-    <div id="sidebar-projects" hidden={!projectsOpen}>
-    {library.projects.map((project) => {
-      const open = expanded[project.id] ?? library.active?.project === project.id;
-      const content = library.contents[project.id];
-      return <div key={project.id}>
-        <div className={`sidebar-project ${library.active?.project === project.id ? "active" : ""} ${dropTarget === project.id ? "drop-target" : ""}`}
-          onDragOver={(event) => { if (event.dataTransfer.types.includes(textDragType)) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropTarget(project.id); } }}
-          onDragLeave={() => setDropTarget(null)} onDrop={(event) => {
-            event.preventDefault(); setDropTarget(null);
-            const text = library.recent.find((item) => item.id === Number(event.dataTransfer.getData(textDragType)));
-            if (text) void moveText(text, project.id);
-          }}>
-          <button className="expand-project" aria-label={`${open ? "Recolher" : "Expandir"} ${project.title}`} aria-expanded={Boolean(open)} onClick={() => {
-            setExpanded((current) => ({ ...current, [project.id]: !open }));
-            if (!open && !content) void library.loadContent(project.id);
-          }}><FolderIcon /><ChevronIcon collapsed={!open} /></button>
-          <Link className="nav-button" href={`/projects/${project.id}`} title={project.title}><span className="sidebar-label">{project.title}</span></Link>
-          <div className="sidebar-row-actions">
-            <details className="action-menu"><summary aria-label={`Opções do projeto ${project.title}`}><MoreIcon /></summary><div><Link href={`/projects/${project.id}`}>Visão geral</Link><Link href={`/projects/${project.id}/read`}>Ler livro</Link></div></details>
-            <Link className="sidebar-icon-action" href={`/projects/${project.id}/new`} aria-label={`Adicionar texto a ${project.title}`} title="Adicionar texto"><ComposeIcon /></Link>
-          </div>
-        </div>
-        {open && <div className="sidebar-chapters">
-          {content ? content.texts.filter((text) => text.parent === null).map((text) => <div key={text.id}>
-            <Link className={`nav-button ${library.active?.text === text.id ? "active" : ""}`} href={`/texts/${text.id}`} title={text.title}>{text.title || "Sem título"}</Link>
-            {content.texts.some((variation) => variation.parent === text.id) && <details className="sidebar-variations" open={content.texts.some((variation) => variation.parent === text.id && library.active?.text === variation.id) || undefined}><summary>Variações</summary>{content.texts.filter((variation) => variation.parent === text.id).map((variation) => <Link key={variation.id} className={`nav-button ${library.active?.text === variation.id ? "active" : ""}`} href={`/texts/${variation.id}`}>{variation.title || "Sem título"}</Link>)}</details>}
-          </div>) : <p className="outline-empty">Carregando…</p>}
-        </div>}
-      </div>;
-    })}
-    </div>
-    <SidebarSection title="Coleções" createHref="/?create=collection" createLabel="Criar coleção" />
-    {library.collections.map((collection) => <Link className="nav-button sidebar-collection" key={collection.id} href={`/?collection=${collection.id}`} title={collection.title}><FolderIcon /><span className="sidebar-label">{collection.title}</span></Link>)}
-    <SidebarSection title="Recentes" open={recentOpen} controls="sidebar-recents" onToggle={() => setRecentOpen(!recentOpen)} />
-    <div id="sidebar-recents" hidden={!recentOpen}>
-    {library.recent.map((text) => <div className="recent-row" key={text.id} draggable={!pending} onDragStart={(event) => { event.dataTransfer.setData(textDragType, String(text.id)); event.dataTransfer.effectAllowed = "move"; }}>
-      <Link className={`nav-button ${library.active?.text === text.id ? "active" : ""}`} href={`/texts/${text.id}`} title={`${text.title || "Sem título"}${text.is_loose ? "" : ` · ${text.project_title}`}`}><span className="sidebar-label">{text.title || "Sem título"}</span></Link>
-      <details className="action-menu"><summary aria-label={`Opções de ${text.title || "texto sem título"}`}><MoreIcon /></summary><div><button disabled={pending} onClick={() => { setError(""); setMoving(text); }}>{text.is_loose ? "Adicionar ao projeto…" : "Mover para…"}</button></div></details>
-    </div>)}
-    </div>
-    {error && !moving && <p role="alert">{error}</p>}
-    {moving && <div className="modal-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="sidebar-move-title">
-      <h2 id="sidebar-move-title">{moving.is_loose ? "Adicionar ao projeto" : "Mover texto"}</h2>
-      {error && <p role="alert">{error}</p>}
-      <form className="form-stack" onSubmit={submitMove}><label htmlFor="sidebar-destination">Projeto de destino</label><select name="project" id="sidebar-destination" required defaultValue=""><option value="" disabled>Escolha um projeto</option>{library.projects.filter((project) => project.id !== moving.project).map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}</select>
-        {!library.projects.some((project) => project.id !== moving.project) && <p>Crie um projeto na biblioteca para organizar este texto.</p>}
-        <div className="button-row"><button type="button" className="secondary" disabled={pending} onClick={() => setMoving(null)}>Cancelar</button><button disabled={pending || !library.projects.some((project) => project.id !== moving.project)}>Adicionar</button></div>
-      </form>
-    </section></div>}
-  </aside>;
+  return (
+    <Box
+      id="library-sidebar"
+      component="nav"
+      aria-label="Navegação da biblioteca"
+      sx={{ p: 1, overflowY: "auto", height: "100%", color: "text.primary" }}
+    >
+      <ListItemButton
+        component={Link}
+        selected={pathname === "/texts/new"}
+        href="/texts/new"
+        onClick={(event) => {
+          if (pathname === "/texts/new") {
+            event.preventDefault();
+            if (!library.guardRef.current || library.guardRef.current())
+              window.dispatchEvent(new Event("logos:new-text"));
+          }
+        }}
+      >
+        <ListItemIcon>
+          <ComposeIcon />
+        </ListItemIcon>
+        <ListItemText primary="Novo texto" />
+      </ListItemButton>
+      <ListItemButton component={Link} selected={pathname === "/"} href="/">
+        <ListItemIcon>
+          <LibraryIcon />
+        </ListItemIcon>
+        <ListItemText primary="Biblioteca" />
+      </ListItemButton>
+      <SidebarSection
+        title="Projetos"
+        open={projectsOpen}
+        controls="sidebar-projects"
+        onToggle={() => setProjectsOpen(!projectsOpen)}
+        createHref="/?create=project"
+        createLabel="Criar projeto"
+      />
+      <Collapse in={projectsOpen}>
+        <Box id="sidebar-projects">
+          {library.projects.map((project) => {
+            const open =
+              expanded[project.id] ?? library.active?.project === project.id;
+            const content = library.contents[project.id];
+            return (
+              <Box key={project.id}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: 2,
+                    position: "relative",
+                    "&:hover .sidebar-row-actions, &:focus-within .sidebar-row-actions":
+                      { opacity: 1 },
+                    bgcolor:
+                      dropTarget === project.id
+                        ? "action.selected"
+                        : library.active?.project === project.id
+                          ? "action.hover"
+                          : undefined,
+                  }}
+                  onDragOver={(event) => {
+                    if (event.dataTransfer.types.includes(textDragType)) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDropTarget(project.id);
+                    }
+                  }}
+                  onDragLeave={() => setDropTarget(null)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDropTarget(null);
+                    const text = library.recent.find(
+                      (item) =>
+                        item.id ===
+                        Number(event.dataTransfer.getData(textDragType)),
+                    );
+                    if (text) void moveText(text, project.id);
+                  }}
+                >
+                  <IconButton
+                    aria-label={`${open ? "Recolher" : "Expandir"} ${project.title}`}
+                    aria-expanded={Boolean(open)}
+                    onClick={() => {
+                      setExpanded((current) => ({
+                        ...current,
+                        [project.id]: !open,
+                      }));
+                      if (!open && !content)
+                        void library.loadContent(project.id);
+                    }}
+                  >
+                    <FolderIcon />
+                  </IconButton>
+                  <ListItemButton
+                    component={Link}
+                    href={`/projects/${project.id}`}
+                    sx={{ px: 0.5, minWidth: 0 }}
+                    title={project.title}
+                  >
+                    <ListItemText primary={project.title} />
+                  </ListItemButton>
+                  <Box
+                    className="sidebar-row-actions"
+                    sx={{
+                      position: "absolute",
+                      right: 0,
+                      display: "flex",
+                      bgcolor: "background.default",
+                      borderRadius: 2,
+                      opacity: 0,
+                      "@media (hover: none)": {
+                        position: "static",
+                        opacity: 1,
+                      },
+                    }}
+                  >
+                    <ActionMenu label={`Opções do projeto ${project.title}`}>
+                      <MenuItem
+                        component={Link}
+                        href={`/projects/${project.id}`}
+                      >
+                        Visão geral
+                      </MenuItem>
+                      <MenuItem
+                        component={Link}
+                        href={`/projects/${project.id}/read`}
+                      >
+                        Ler livro
+                      </MenuItem>
+                    </ActionMenu>
+                    <IconButton
+                      component={Link}
+                      href={`/projects/${project.id}/new`}
+                      aria-label={`Adicionar texto a ${project.title}`}
+                    >
+                      <ComposeIcon />
+                    </IconButton>
+                  </Box>
+                </Box>
+                <Collapse in={Boolean(open)}>
+                  <Box sx={{ pl: 3 }}>
+                    {content ? (
+                      content.texts
+                        .filter((text) => text.parent === null)
+                        .map((text) => (
+                          <Box key={text.id}>
+                            <ListItemButton
+                              component={Link}
+                              selected={library.active?.text === text.id}
+                              href={`/texts/${text.id}`}
+                              title={text.title}
+                            >
+                              <ListItemText
+                                primary={text.title || "Sem título"}
+                              />
+                            </ListItemButton>
+                            {content.texts.some(
+                              (variation) => variation.parent === text.id,
+                            ) && (
+                              <Box
+                                component="details"
+                                sx={{
+                                  color: "text.secondary",
+                                  pl: 1,
+                                  fontSize: 16,
+                                }}
+                                open={
+                                  content.texts.some(
+                                    (variation) =>
+                                      variation.parent === text.id &&
+                                      library.active?.text === variation.id,
+                                  ) || undefined
+                                }
+                              >
+                                <summary>Variações</summary>
+                                {content.texts
+                                  .filter(
+                                    (variation) => variation.parent === text.id,
+                                  )
+                                  .map((variation) => (
+                                    <ListItemButton
+                                      component={Link}
+                                      selected={
+                                        library.active?.text === variation.id
+                                      }
+                                      key={variation.id}
+                                      href={`/texts/${variation.id}`}
+                                    >
+                                      <ListItemText
+                                        primary={
+                                          variation.title || "Sem título"
+                                        }
+                                      />
+                                    </ListItemButton>
+                                  ))}
+                              </Box>
+                            )}
+                          </Box>
+                        ))
+                    ) : (
+                      <Box sx={{ p: 1, color: "text.secondary" }}>
+                        Carregando…
+                      </Box>
+                    )}
+                  </Box>
+                </Collapse>
+              </Box>
+            );
+          })}
+        </Box>
+      </Collapse>
+      <SidebarSection
+        title="Coleções"
+        createHref="/?create=collection"
+        createLabel="Criar coleção"
+      />
+      {library.collections.map((collection) => (
+        <ListItemButton
+          component={Link}
+          key={collection.id}
+          href={`/?collection=${collection.id}`}
+          title={collection.title}
+        >
+          <ListItemIcon>
+            <FolderIcon />
+          </ListItemIcon>
+          <ListItemText primary={collection.title} />
+        </ListItemButton>
+      ))}
+      <SidebarSection
+        title="Recentes"
+        open={recentOpen}
+        controls="sidebar-recents"
+        onToggle={() => setRecentOpen(!recentOpen)}
+      />
+      <Collapse in={recentOpen}>
+        <Box id="sidebar-recents">
+          {library.recent.map((text) => (
+            <Box
+              sx={{ display: "flex", alignItems: "center" }}
+              key={text.id}
+              draggable={!pending}
+              onDragStart={(event) => {
+                event.dataTransfer.setData(textDragType, String(text.id));
+                event.dataTransfer.effectAllowed = "move";
+              }}
+            >
+              <ListItemButton
+                component={Link}
+                sx={{ minWidth: 0 }}
+                selected={library.active?.text === text.id}
+                href={`/texts/${text.id}`}
+                title={`${text.title || "Sem título"}${text.is_loose ? "" : ` · ${text.project_title}`}`}
+              >
+                <ListItemText primary={text.title || "Sem título"} />
+              </ListItemButton>
+              <ActionMenu
+                label={`Opções de ${text.title || "texto sem título"}`}
+              >
+                <MenuItem
+                  disabled={pending}
+                  onClick={() => {
+                    setError("");
+                    setMoving(text);
+                  }}
+                >
+                  {text.is_loose ? "Adicionar ao projeto…" : "Mover para…"}
+                </MenuItem>
+              </ActionMenu>
+            </Box>
+          ))}
+        </Box>
+      </Collapse>
+      {error && !moving && <Alert severity="error">{error}</Alert>}
+      <Dialog
+        open={Boolean(moving)}
+        onClose={() => {
+          if (!pending) setMoving(null);
+        }}
+        aria-labelledby="sidebar-move-title"
+      >
+        <DialogTitle id="sidebar-move-title">
+          {moving?.is_loose ? "Adicionar ao projeto" : "Mover texto"}
+        </DialogTitle>
+        <Box component="form" onSubmit={submitMove}>
+          <DialogContent>
+            <Stack spacing={2}>
+              {error && <Alert severity="error">{error}</Alert>}
+              <TextField
+                select
+                label="Projeto de destino"
+                name="project"
+                id="sidebar-destination"
+                required
+                defaultValue=""
+                slotProps={{ select: { native: true } }}
+              >
+                <option value="" disabled>
+                  Escolha um projeto
+                </option>
+                {library.projects
+                  .filter((project) => project.id !== moving?.project)
+                  .map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.title}
+                    </option>
+                  ))}
+              </TextField>
+              {!library.projects.some(
+                (project) => project.id !== moving?.project,
+              ) && (
+                <Box>
+                  Crie um projeto na biblioteca para organizar este texto.
+                </Box>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              type="button"
+              disabled={pending}
+              onClick={() => setMoving(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={
+                pending ||
+                !library.projects.some(
+                  (project) => project.id !== moving?.project,
+                )
+              }
+            >
+              Adicionar
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+    </Box>
+  );
 }

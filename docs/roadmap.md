@@ -114,7 +114,8 @@ Primeiro ajuste concluído no Logos: barra azul `#1976d2`, logo Wtree branca,
 largura total, navegação com seleção arredondada, posição fixa durante a rolagem
 e alturas de 64px no desktop e 56px no mobile. Referências: Logos legado e Holding.
 
-A versão neutra para o App Creator será feita em uma rodada separada.
+Esse registro descreve a barra anterior à consolidação MUI. A base neutra
+foi implementada nesta rodada e transferida ao template.
 
 Rodada de navegação implementada: lateral compartilhada e recolhível com Novo
 texto, biblioteca, Projects expansíveis, Collections e recentes. A busca fica
@@ -126,7 +127,7 @@ preview lateral opcional à direita. Cartões de Projects e
 Collections preservados; upload de capas concluído. Geração de EPUB segue
 na etapa de publicação.
 
-## Interface — consolidação global planejada
+## Interface — consolidação global implementada
 
 Sequência: `Holding -> Logos -> App Creator`.
 
@@ -134,18 +135,21 @@ Sequência: `Holding -> Logos -> App Creator`.
 - [x] Consolidar a direção com imagens e preferências do usuário.
 - [x] Mapear arquitetura, consumidores, remoções e validação.
 - [x] Confirmar MUI + Geist e refatoração direta da fundação visual.
-- [ ] Integrar MUI/Emotion/Next com manifestos e locks compatíveis.
-- [ ] Reaproveitar tema da Holding com identidade neutra; erro em laranja.
-- [ ] Usar controles MUI e reutilizar composições de cabeçalho da Holding.
-- [ ] Separar os painéis recolhíveis dos dados e da disponibilidade do preview.
-- [ ] Permitir painel direito vazio na biblioteca.
-- [ ] Refatorar todas as views e remover componentes/estilos substituídos.
-- [ ] Validar escrita, navegação, responsividade e troca de identidade.
-- [ ] Registrar o guia de interface alinhado aos componentes implementados.
-- [ ] Transferir fundação genérica e guia ao template do App Creator.
-- [ ] Validar geração limpa e independência do app gerado.
+- [x] Integrar MUI/Emotion/Next com manifestos e locks compatíveis.
+- [x] Reaproveitar tema da Holding com identidade neutra; erro em laranja.
+- [x] Usar controles MUI e reutilizar composições de cabeçalho da Holding.
+- [x] Separar os painéis recolhíveis dos dados e da disponibilidade do preview.
+- [x] Permitir painel direito vazio na biblioteca.
+- [x] Refatorar todas as views e remover componentes/estilos substituídos.
+- [x] Executar testes e checagem preliminar de escrita, navegação e responsividade.
+- [ ] Concluir validação complementar, troca de identidade e aceite visual pelo usuário.
+- [x] Registrar o guia de interface alinhado aos componentes implementados.
+- [x] Transferir fundação genérica e guia ao template do App Creator.
+- [x] Validar geração limpa e independência do app gerado.
 
 Criar/editar segue a leveza visual da referência GPT; biblioteca/livro usam
 cards da Holding em paleta neutra. O [plano](frontend-layout-plan.md) detalha
 responsabilidades e sequência. Organização fina de capas, textos e ações,
 preview de ebook e evolução de leitura ficam para rodadas posteriores.
+
+Os resultados e limites estão no [registro da rodada](frontend-validation.md).

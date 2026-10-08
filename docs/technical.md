@@ -9,9 +9,9 @@ Browser -> Next.js (`web`) -> Django REST (`api`) -> banco/storage
 Direção: monólito modular derivado da fundação do App Creator, sem regras do
 Holding.
 
-## Fundação visual — arquitetura planejada
+## Fundação visual — arquitetura implementada
 
-Implementação pendente. Decisão confirmada: adotar MUI e Geist, reaproveitando
+MUI e Geist implementados, reaproveitando
 o tema, as composições e a integração Next da Holding. O tema MUI concentra
 cores, fontes, métricas e variantes, com identidade neutra configurável e
 variáveis CSS geradas pelo próprio tema. Usar componentes MUI diretamente;
@@ -21,23 +21,23 @@ de conteúdo e geometria do domínio, sem um segundo sistema visual em CSS.
 O shell recebe cabeçalho, navegação esquerda, conteúdo central e painel direito
 por composição. Estado de abertura e host do painel direito ficam separados
 dos dados de `useLibrary`. O editor conserva seu rascunho e publica o preview
-no host estável por portal. O painel pode existir vazio e recolher sem remontar
+no host do shell por portal. O painel pode existir vazio e recolher sem remontar
 o editor; conteúdo da view anterior é limpo ao navegar.
 
 O frontend pode ser refatorado diretamente para a estrutura final, removendo
 componentes e definições locais substituídos. O uso é pessoal e o produto está
 em desenvolvimento; não criar adaptadores de legado, flags de transição ou
 duas bases visuais permanentes. Preservar dados e comportamentos editoriais.
-A fundação terá duas composições, oficina de texto leve e cards de biblioteca/
+A fundação possui duas composições, oficina de texto leve e cards de biblioteca/
 livro, compartilhando a mesma identidade. Não acrescenta regra de backend,
 endpoint ou dependência de runtime entre os repositórios. Manifestos e locks
-receberão MUI/Emotion e o adaptador Next compatíveis na implementação; não
+registram MUI/Emotion e o adaptador Next compatíveis; não
 acoplar as consultas de Logos ao QueryClient financeiro da Holding.
 
 O [plano da fundação visual](frontend-layout-plan.md) registra fontes de
 reaproveitamento, arquivos, contratos, sequência e validações. É um detalhamento
-desta arquitetura. O guia de interface será criado com a implementação; deve
-apontar onde cada padrão é definido, evitando uma segunda fonte de valores.
+desta arquitetura. O [guia da interface](frontend-guide.md) aponta a fonte de cada padrão.
+`useProjectEditor.ts` preserva as operações editoriais separadas da apresentação.
 
 ## Dados centrais
 
@@ -176,3 +176,9 @@ browser, sem otimização remota do Next.
 
 Publicação externa, histórico automático de revisões, tags, subpastas,
 colaboração e integração com IA não pertencem ao MVP.
+
+## Estado da rodada visual
+
+Implementação concluída, com resultados locais já registrados. Aceite visual
+e validação complementar ficam para a próxima rodada do usuário; consulte
+[frontend-validation.md](frontend-validation.md).

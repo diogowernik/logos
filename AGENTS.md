@@ -42,3 +42,10 @@ somente nos três documentos canônicos citados acima.
 - Valide builds com `NEXT_DIST_DIR=.next-codex` para preservar o servidor dev.
 - Leia `docs/foundation.md`; acrescente documentação de produto antes do domínio.
 - Não copie dados, segredos ou dependências de projetos de referência.
+
+## Interface
+
+- Use MUI + Geist e leia `docs/frontend-guide.md` antes de alterar a interface.
+- Identidade em `web/src/config/app.ts`; padrões recorrentes no tema MUI.
+- Use MUI diretamente; CSS local somente para conteúdo especializado.
+- Não reintroduza controles nativos estilizados nem uma segunda base visual.

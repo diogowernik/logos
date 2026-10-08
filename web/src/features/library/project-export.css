@@ -1,4 +1,0 @@
-.project-export { margin-top: 1.25rem; }
-.epub-download { display: inline-flex; align-items: center; gap: .5rem; color: var(--muted); text-decoration: none; font-size: .875rem; padding: .5rem; border-radius: var(--radius); }
-.epub-download:hover { color: var(--accent); background: #e9eef8; }
-.epub-generated { color: var(--muted); font-size: .75rem; margin: .5rem 0 0; }

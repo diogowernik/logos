@@ -19,8 +19,9 @@ Rotas compõem a interface; componentes contêm interação; `src/api/client.ts`
 centraliza JSON, FormData e downloads; `src/server/django.ts` contém acesso
 server-side ao backend. Páginas privadas chamam `requireUser()` antes de carregar
 conteúdo; o layout sozinho não impede a renderização paralela de seus filhos.
-Tema mínimo usa tokens CSS e controles nativos, sem
-impor navegação ou páginas de negócio. Acrescente providers quando houver uso.
+A interface usa MUI + Emotion + Geist, com tema centralizado, cache SSR e
+providers mínimos. Card/Paper e painéis opcionais seguem o
+[guia da interface](frontend-guide.md). O shell não carrega regras de domínio.
 
 SQLite atende desenvolvimento; `DATABASE_URL` permite PostgreSQL. Storage
 privado e processamento de jobs devem ser implementados no domínio conforme

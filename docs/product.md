@@ -162,13 +162,13 @@ A lateral segue as referências fornecidas do GPT: mesma escala de texto,
 peso normal, cores neutras suaves, ícones SVG de 20px e linhas alinhadas.
 Projects usam pasta; no hover/foco aparece o lápis para adicionar um Text e o
 menu contextual. Em dispositivos sem hover, as ações permanecem visíveis.
-O formato de navegação será preservado na consolidação visual descrita abaixo.
-Atualmente seu estilo vive em `sidebar.css`, junto de seu componente; os papéis
-comuns de cor, fonte e controles serão transferidos à base compartilhada.
+O formato de navegação foi preservado na consolidação visual. Fonte, cores
+e controles agora consomem o tema MUI; `sidebar.css` foi removido. A revisão
+visual final permanece pendente.
 
-## Direção visual — próxima rodada
+## Direção visual — base implementada
 
-Planejada em 7 de outubro de 2026; implementação pendente. A sequência é
+Implementada em 7 de outubro de 2026; aceite visual pendente. A sequência é
 `Holding -> Logos -> App Creator`. Primeiro consolidar a identidade do app,
 substituindo ajustes locais repetidos; depois organizar conteúdo, imagens e
 novas possibilidades de produto.
@@ -193,7 +193,7 @@ trabalho. O direito pode abrir vazio na biblioteca; preview de ebook ou leitura
 serão definidos depois. O preview de Markdown durante a escrita permanece.
 
 As duas composições compartilham tema, fontes, controles e espaçamentos. A base
-consolidada, os painéis opcionais e o guia de interface beneficiarão o template
+consolidada, os painéis opcionais e o guia de interface foram transferidos ao template
 do App Creator. O [plano de execução](frontend-layout-plan.md) detalha essa
 direção sem alterar as regras editoriais acima.
 

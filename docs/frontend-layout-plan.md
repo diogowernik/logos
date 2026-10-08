@@ -1,11 +1,12 @@
 # Planejamento da fundação visual
 
-Data: 7 de outubro de 2026. Estado: planejamento concluído; implementação pendente.
+Data: 7 de outubro de 2026. Estado: implementação concluída; aceite visual e validação complementar pendentes.
 
 Este plano detalha a direção de [produto](product.md), a organização prevista
 nas [notas técnicas](technical.md) e a sequência do [roadmap](roadmap.md).
 As observações vieram do código atual e das imagens fornecidas pelo usuário.
-Não houve execução ou validação interativa dos apps nesta rodada.
+O estudo inicial foi seguido de implementação, testes e validação interativa,
+registrados em [frontend-validation.md](frontend-validation.md).
 
 ## Objetivo e ordem
 
@@ -36,29 +37,29 @@ possibilidades futuras, sem implementação desses usos nesta fundação.
 A reorganização detalhada de capas, informações e funcionalidades vem depois.
 Conteúdo provisório não será tratado automaticamente como defeito de produto.
 
-## Diagnóstico e reaproveitamento
+## Diagnóstico anterior à refatoração e reaproveitamento
 
 | Origem | O que aproveitar | Adaptação em Logos |
 | --- | --- | --- |
 | Holding `web/src/theme/index.ts` | Escala, raio, borda, sombra, superfícies e estados | Tema MUI comum com identidade configurável, sem verde fixo |
 | Holding `CardHeader` | Padding de 10px × 16px, título 18px/peso 500, divisória e ações à direita | Cabeçalho comum com título ou controles por composição |
 | Holding `DataSection.tsx` | Paper contornado para subdivisões necessárias | Paper sem sombra de card externo |
-| Holding `HeaderControls.tsx` | Alinhamento, agrupamento e ações por ícone de 40px | Componentes comuns usados por cards e barras de escrita |
+| Holding `HeaderControls.tsx` | Alinhamento, agrupamento e ações por ícone de 40px | Agrupamento reaproveitado; ações discretas de 36px na base atual por cards e barras de escrita |
 | Holding `CardTabsHeader.tsx` | Abas na mesma faixa das ações | Reutilizar a composição MUI quando houver consumo real; documentar o padrão |
 | Holding `frontend-ui-guide.md` | Hierarquia, economia, responsabilidades e correção na base | Guia próprio com composição de escrita e painéis |
 | Logos `LibraryShell.tsx` | Navegação contínua e estrutura de três áreas | Separar dados da biblioteca e estado dos painéis |
 | Logos `sidebar.css` | Fonte uniforme, recuos, ícones e ações no hover/foco | Cores e métricas comuns; estilos específicos só para a árvore editorial |
 | Logos `ProjectEditor.tsx` | Título discreto, copiar/salvar por ícone, rascunho e preview ao vivo | Consumir base visual e painel direito genérico |
 
-Hoje `globals.css` define separadamente `.project-card`, `.project-overview`,
+Antes da refatoração, `globals.css` definia separadamente `.project-card`, `.project-overview`,
 `.text-editor`, títulos, menus e botões. `sidebar.css`, `project-files.css` e
 `project-export.css` acrescentam cores e dimensões próprias. A família geral é
 `system-ui`; erros e ações destrutivas usam vermelho `#9c2525` diretamente.
 
-`LibraryShell` mistura projetos, Collections, recentes e guardas de edição com
-`previewOpen`, `previewAvailable` e o host do preview. O direito só aparece
-quando `previewAvailable` é verdadeiro. Isso impede sua existência vazia na
-biblioteca e acopla uma capacidade estrutural a uma ferramenta do editor.
+Antes da refatoração, `LibraryShell` misturava projetos, Collections, recentes e guardas de edição com
+`previewOpen`, `previewAvailable` e o host do preview. O direito só aparecia
+quando `previewAvailable` era verdadeiro. Isso impedia sua existência vazia na
+biblioteca e acoplava uma capacidade estrutural a uma ferramenta do editor.
 
 ## Decisão de arquitetura
 
@@ -84,33 +85,32 @@ Holding permanece a referência MUI; não será convertida para CSS próprio.
 Nesta rodada, não criar dependência de runtime entre repositórios. A base comum
 será incorporada ao template após validação, com versão e instruções de adoção.
 
-Organização prevista, com nomes ajustáveis durante a implementação:
+Organização implementada:
 
 ```text
 web/src/
+├── config/app.ts                  # nome, navegação e identidade
 ├── theme/
-│   ├── createAppTheme.ts          # escala e identidade configurável
-│   ├── components.ts             # defaults/overrides/variantes MUI comuns
-│   └── types.ts                  # extensões do tema quando necessárias
+│   ├── index.ts                   # createAppTheme, fontes, superfícies e larguras
+│   ├── components.ts              # defaults e overrides MUI
+│   └── types.ts                   # extensão do tema e contrato da identidade
 ├── components/
-│   ├── AppProviders.tsx          # ThemeProvider + CssBaseline
+│   ├── AppProviders.tsx           # ThemeProvider + CssBaseline
+│   ├── AppHeader.tsx              # branding, navegação e controles dos painéis
 │   ├── ui/
-│   │   ├── DataSection.tsx        # composição Paper + CardHeader da Holding
-│   │   ├── HeaderControls.tsx      # composições comprovadas da Holding
-│   │   └── composições reais      # componentes MUI usados diretamente
-│   └── shell/
-│       ├── AppShell.tsx           # Box/AppBar/Drawer + três áreas por slots
-│       ├── WorkspacePanels.tsx    # estado visual e host estável à direita
-│       └── layout.ts              # métricas do shell, consumidas pelo tema
+│   │   ├── DataSection.tsx
+│   │   ├── HeaderControls.tsx
+│   │   └── ActionMenu.tsx
+│   └── shell/AppShell.tsx         # layout, estado dos painéis, host e breakpoints
 ├── features/library/
 │   ├── LibraryShell.tsx           # dados/guardas + composição do shell
 │   ├── Library.tsx
-│   ├── LibrarySidebar.tsx         # árvore, recentes e operações editoriais
-│   ├── ProjectEditor.tsx          # rascunho, operações e composição das views
-│   └── estilos da feature         # geometria editorial e capas
+│   ├── LibrarySidebar.tsx
+│   ├── ProjectEditor.tsx          # apresentação de projeto, escrita e leitura
+│   └── useProjectEditor.ts        # estado e operações editoriais
 └── app/
-    ├── layout.tsx                # Geist + cache Next/MUI + providers
-    └── globals.css               # camadas CSS e regras mínimas de documento
+    ├── layout.tsx                 # Geist + cache Next/MUI + providers
+    └── globals.css                # layers e conteúdo Markdown
 ```
 
 Os componentes visuais recebem conteúdo e callbacks; não carregam projetos,
@@ -174,7 +174,7 @@ controles têm métricas por papel, sem variantes inventadas por tela.
 - **Cabeçalho:** título ou controles à esquerda; ações à direita; alinhamento
   central, divisória e quebra quando necessária. Altura resulta do conteúdo
   e do padding; não fixar uma altura que corte controles.
-- **Ações:** gap de 8px; ações por ícone têm tamanho padrão de 40px. A variante
+- **Ações:** gap de 8px; ações por ícone têm tamanho padrão de 36px. A variante
   discreta usa fundo transparente, a contornada serve aos cards. Copiar e salvar
   recebem rótulo acessível e tooltip; botões de formulário, como confirmar uma
   criação, podem manter texto.
@@ -198,19 +198,21 @@ continua existindo; a ausência da configuração significa que o app não o usa
 Layout e dimensões são do shell; a feature fornece navegação e conteúdo. Evitar
 dois elementos `aside` aninhados ao adaptar `LibrarySidebar`.
 
-`WorkspacePanels` mantém `leftOpen`, `rightOpen`, operações de alternância e
+`AppShell`, por meio de `useShell()`, mantém `leftOpen`, `rightOpen`, operações de alternância e
 `rightHost`. Os controles do cabeçalho e do editor consomem o mesmo estado.
 `useLibrary` preserva dados, seleção, refresh e guardas; o preview não decide
 se o painel existe. O editor publica seu preview no host por portal, como já
 faz. Fora da escrita, o painel continua disponível e pode ficar vazio.
 
-Os painéis configurados permanecem montados ao recolher, incluindo o host
-direito e a árvore esquerda, preservando sua expansão. Alternar painéis ou
+Os painéis configurados permanecem montados ao recolher. Ao trocar entre
+coluna e sobreposição, o host direito e o conteúdo da lateral podem ser
+recriados; o portal acompanha o host atual. A garantia de conservação de
+rascunho pertence ao editor central, que não muda de posição na árvore React. Alternar painéis ou
 mudar a largura não remonta o editor nem substitui seu rascunho. Ao sair da
 escrita, o portal é desmontado com a view: não deixar conteúdo de outro texto
 na biblioteca. O painel oculto não fica disponível para foco por teclado.
 
-Política inicial proposta:
+Política implementada (aceite visual ainda pendente):
 
 - tela larga: três áreas; esquerda e direita começam abertas, inclusive na
   biblioteca. Esquerda parte de 260px; direita de 320–360px, com limite conforme
@@ -226,14 +228,13 @@ O fechamento após navegar na esquerda respeita o cancelamento do link pelas
 guardas de alterações não salvas. O componente de navegação deve informar essa
 ação ao shell sem depender de um nome de classe CSS antigo.
 
-A referência atual de 1100px deixa aproximadamente 520px para o painel central
-com ambas as laterais abertas, antes dos seus espaçamentos. Propor 1280px como
-ponto inicial para a composição de três áreas, conferindo 1100, 1280 e 1440px
-durante a implementação. O valor é uma proposta de geometria, não uma cópia
-medida da referência.
+Com as larguras implementadas, 1100px deixa 480px para o painel central
+quando os dois painéis estão abertos, antes dos espaçamentos. A direita inicia
+aberta somente a partir de 1280px. Abaixo de 1100px, abre sobreposta. Esses
+limites são escolhas de composição; a revisão visual final ainda está pendente.
 
-Concentrar métricas do shell em `layout.ts` e breakpoints no tema. Usar
-`useMediaQuery` do MUI e estilos responsivos consumindo os mesmos breakpoints.
+As larguras ficam no tema; os limites de 761/1100/1280px ficam em `AppShell`.
+O shell usa `useMediaQuery` do MUI para escolher coluna ou sobreposição.
 Drawer temporário atende às sobreposições; a grade desktop pode usar Box com
 CSS grid. Evitar definições paralelas de limites em CSS e JavaScript.
 O snapshot do servidor deve ser determinístico; a hidratação não pode substituir
@@ -269,8 +270,8 @@ apagar classes. Não adicionar uma camada final de overrides nem recorrer a
 2. **Composições:** reutilizar HeaderControls e DataSection da Holding, com
    componentes MUI diretamente nas views. Usar biblioteca, projeto e barra
    do editor como consumidores reais do tema e das variantes.
-3. **Shell:** separar estado visual de `useLibrary`, manter host de portal
-   estável e liberar o direito vazio. Definir overlays e teclado em mobile.
+3. **Shell:** separar estado visual de `useLibrary`, acompanhar o host de portal
+   sem remontar o editor e liberar o direito vazio. Definir overlays e teclado em mobile.
 4. **Migração global:** cobrir biblioteca, Collections, projeto, escrita,
    leitura básica, arquivos, exportação e autenticação. Remover estilos
    substituídos e verificar que o editor continua simples e confortável.
@@ -284,9 +285,9 @@ deixar biblioteca, projeto e editor com três sistemas visuais concorrentes.
 
 ## Verificação e critérios de conclusão
 
-Para documentação desta rodada: conferir links locais, consistência entre
-produto/técnica/roadmap e `git diff --check`. Testes da aplicação ficam para a
-implementação.
+Os resultados já observados e a validação ainda pendente estão em
+[frontend-validation.md](frontend-validation.md). O fechamento documental
+confere links e consistência dos registros, sem executar novamente a aplicação.
 
 Na implementação, aproveitar `web/tests/library.test.tsx`: já cobre criação
 simples, salvamento, rascunho após erro, alternância de preview, leitura e texto
@@ -310,19 +311,19 @@ e existente, Markdown longo, erro de salvamento e painel direito vazio.
 Conferir 390, 760, 1100, 1280 e 1440px, zoom de 200%, navegação por teclado,
 leitura dos rótulos por ícone e controles em dispositivos sem hover.
 
-Critérios:
+Critérios de implementação e aceite:
 
-- [ ] Card, Paper, título e ações têm a mesma definição em todas as views.
-- [ ] Controles recorrentes usam MUI, sem uma biblioteca própria paralela.
-- [ ] Grupos e itens laterais mantêm tamanho uniforme e seleção suave.
-- [ ] Copiar/salvar são ícones identificáveis, alinhados à direita.
-- [ ] Escrita permanece confortável e suas ações não disputam atenção.
-- [ ] Direito abre vazio na biblioteca; os dois painéis recolhem corretamente.
-- [ ] Alternar/reorganizar painéis preserva rascunho, seleção e operações.
-- [ ] Trocar a identidade no tema atualiza o conjunto sem editar features.
-- [ ] Erros usam laranja legível, com mensagem e recuperação preservadas.
-- [ ] Estilos locais substituídos foram removidos; o guia aponta a fonte comum.
-- [ ] App gerado funciona sem consultar Holding ou Logos.
+- [x] Card, Paper, título e ações têm a mesma definição em todas as views.
+- [x] Controles recorrentes usam MUI, sem uma biblioteca própria paralela.
+- [x] Grupos e itens laterais mantêm tamanho uniforme e seleção suave.
+- [x] Copiar/salvar são ícones identificáveis, alinhados à direita.
+- [ ] Escrita permanece confortável e suas ações não disputam atenção. — aceite complementar pendente.
+- [x] Direito abre vazio na biblioteca; os dois painéis recolhem corretamente.
+- [ ] Alternar/reorganizar painéis preserva rascunho, seleção e operações. — aceite complementar pendente.
+- [ ] Trocar a identidade no tema atualiza o conjunto sem editar features. — aceite complementar pendente.
+- [ ] Erros usam laranja legível, com mensagem e recuperação preservadas. — aceite complementar pendente.
+- [x] Estilos locais substituídos foram removidos; o guia aponta a fonte comum.
+- [x] App gerado funciona sem consultar Holding ou Logos.
 
 ## Limites desta entrega
 
@@ -350,3 +351,11 @@ Referências técnicas consultadas na avaliação:
 - [Temas extensíveis](https://mui.com/material-ui/guides/building-extensible-themes/);
 - [Drawer](https://mui.com/material-ui/react-drawer/);
 - [React Resizable Panels](https://github.com/bvaughn/react-resizable-panels).
+
+## Entrega implementada
+
+MUI/Emotion e Geist integrados; tema centralizado, controles e composições
+substituídos diretamente. CSS antigo removido. O [guia](frontend-guide.md)
+registra a fonte de cada padrão e o uso dos painéis. O domínio e a
+autenticação foram preservados. O [registro da rodada](frontend-validation.md)
+distingue verificações executadas de aceite visual e validação pendentes.

@@ -35,17 +35,17 @@ export type EpubImportJob = {
   created_at: string;
 };
 export type ExtractionPreview = {
-  project: number;
+  group: number | null;
   source: EpubSource | "markdown";
   source_sha256: string;
-  project_state: string;
+  group_state: string;
   existing_text_count: number;
   existing_primary_count: number;
   requires_confirmation: boolean;
   warnings: ImportWarning[];
   sections: { href: string; title: string; position: number; markdown: string }[];
 };
-export type ExtractionResult = { project: number; source: EpubSource; mode: string; text_ids: number[]; reused: boolean };
+export type ExtractionResult = { project: number; group: number; source: EpubSource; mode: string; text_ids: number[]; reused: boolean };
 
 export function importDiagnostic(value: unknown): ImportDiagnostic | null {
   if (!value || typeof value !== "object") return null;

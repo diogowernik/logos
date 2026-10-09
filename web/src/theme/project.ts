@@ -100,9 +100,6 @@ export const ChapterReadButton = styled(ReadingButton)({
   minWidth: 0,
   overflowWrap: "anywhere",
 });
-export const ProjectVersionLabel = styled(Typography)(({ theme }) => ({
-  marginLeft: theme.spacing(1),
-}));
 export const ProjectCoverRoot = styled(Box)({
   width: 96,
   flexShrink: 0,

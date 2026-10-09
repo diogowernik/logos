@@ -2,20 +2,17 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import Tab from "@mui/material/Tab";
-import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
-import Accordion from "@mui/material/Accordion";
-import AccordionSummary from "@mui/material/AccordionSummary";
-import AccordionDetails from "@mui/material/AccordionDetails";
 import { CopyIcon, ComposeIcon } from "@/components/icons/NavigationIcons";
 import { HeaderActions, CompactActionButton, } from "@/components/ui/HeaderControls";
-import { ChapterRow, ChapterDragHandle, ChapterReadButton, ProjectIdentity, ProjectSummary, ProjectTitleGroup, ProjectTitle, ProjectFeedback, ProjectTabs, ProjectTabPanel, ProjectPanelToolbar, ProjectVersionLabel, } from "@/theme/project";
+import { ChapterRow, ChapterDragHandle, ChapterReadButton, ProjectIdentity, ProjectSummary, ProjectTitleGroup, ProjectTitle, ProjectFeedback, ProjectTabs, ProjectTabPanel, ProjectPanelToolbar, } from "@/theme/project";
 import { useShell } from "@/components/shell/AppShell";
+import { ProjectGroups } from "./ProjectGroups";
 import { ProjectReading, type ReadingDocument } from "./ProjectReading";
 import { ProjectCover } from "./ProjectCover";
 import { ProjectFiles } from "./ProjectFiles";
@@ -44,6 +41,7 @@ export function ProjectOverview({ editor, }: {
     const { project } = data;
     const primary = data.texts.filter((text) => text.parent === null);
     return (<Stack component="section" spacing={2}>
+      {!project.is_inbox && <ProjectGroups editor={editor} />}
       <Card component="section" aria-label="Área de trabalho do livro">
         <ProjectTabs value={project.is_inbox ? "chapters" : section} onChange={(_, value: string) => setSection(value)} aria-label="Seções do livro" variant="scrollable" scrollButtons="auto">
           {!project.is_inbox && <Tab value="overview" label="Visão geral" id="project-tab-overview" aria-controls="project-panel-overview"/>}
@@ -77,7 +75,7 @@ export function ProjectOverview({ editor, }: {
             </Typography>
             <HeaderActions>
               <CompactActionButton label="Copiar todos os textos" disabled={pending || !primary.some((text) => text.markdown.trim())} onClick={copyTexts}><CopyIcon /></CompactActionButton>
-              <Button component={Link} href={`/projects/${project.id}/new`} disabled={pending}>
+              <Button component={Link} href={`/projects/${project.id}/new?group=${data.group.id}`} disabled={pending}>
                 + Adicionar texto
               </Button>
             </HeaderActions>
@@ -119,32 +117,16 @@ export function ProjectOverview({ editor, }: {
           </ProjectTabPanel>)}
         {!project.is_inbox && <>
           <ProjectTabPanel role="tabpanel" id="project-panel-markdown" aria-labelledby="project-tab-markdown" hidden={section !== "markdown"}>
-            <ProjectMarkdown projectId={project.id} onRead={setReadingMarkdown} onBusy={setImportPending} blocked={pending} onExtracted={refreshAfterImport}/>
+            <ProjectMarkdown key={data.group.id} groupId={data.group.id} groups={data.groups} projectId={project.id} onRead={setReadingMarkdown} onBusy={setImportPending} blocked={pending} onExtracted={refreshAfterImport}/>
           </ProjectTabPanel>
           <ProjectTabPanel role="tabpanel" id="project-panel-imports" aria-labelledby="project-tab-imports" hidden={section !== "imports"}>
-            <ProjectEpubs key={project.id} projectId={project.id} jobs={data.imports ?? []} onJob={updateImport} onExtracted={refreshAfterImport} onBusy={setImportPending} blocked={pending}/>
+            <ProjectEpubs key={data.group.id} groupId={data.group.id} groups={data.groups} projectId={project.id} jobs={data.imports ?? []} onJob={updateImport} onExtracted={refreshAfterImport} onBusy={setImportPending} blocked={pending}/>
           </ProjectTabPanel>
           <ProjectTabPanel role="tabpanel" id="project-panel-generation" aria-labelledby="project-tab-generation" hidden={section !== "generation"}>
-            <ProjectExport projectId={project.id} artifact={data.epub ?? null} hasContent={primary.some((text) => text.markdown.trim())} onChange={updateEpub} blocked={pending} onBusy={setImportPending}/>
+            <ProjectExport key={data.group.id} groupId={data.group.id} artifact={data.epub ?? null} hasContent={primary.some((text) => text.markdown.trim())} onChange={updateEpub} blocked={pending} onBusy={setImportPending}/>
           </ProjectTabPanel>
         </>}
       </Card>
       <ProjectReading document={reading}/>
-      {data.versions.length > 1 && (<Accordion>
-          <AccordionSummary>Versões do projeto</AccordionSummary>
-          <AccordionDetails>
-            <Stack spacing={1}>
-              {data.versions.map((version) => (<Box component={Link} key={version.id} href={`/projects/${version.id}`}>
-                  {version.is_principal ? "● " : "○ "}
-                  {version.title}
-                  <ProjectVersionLabel variant="caption">
-                    {version.is_principal
-                    ? "Principal"
-                    : `${version.text_count} textos`}
-                  </ProjectVersionLabel>
-                </Box>))}
-            </Stack>
-          </AccordionDetails>
-        </Accordion>)}
     </Stack>);
 }

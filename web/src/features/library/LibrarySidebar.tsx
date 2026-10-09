@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { textLocation } from "./text-location";
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
 import type { TextSummary } from "./types";
@@ -307,7 +308,7 @@ export function LibrarySidebar() {
                 sx={{ minWidth: 0 }}
                 selected={library.active?.text === text.id}
                 href={`/texts/${text.id}`}
-                title={`${text.title || "Sem título"}${text.is_loose ? "" : ` · ${text.project_title}`}`}
+                title={`${text.title || "Sem título"}${text.is_loose ? "" : ` · ${textLocation(text)}`}`}
               >
                 <ListItemText primary={text.title || "Sem título"} />
               </ListItemButton>

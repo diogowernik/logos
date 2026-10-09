@@ -14,10 +14,10 @@ import type { EpubArtifact } from "@/features/library/types";
 const artifact: EpubArtifact = {
   filename: "livro_v1.epub",
   generation: 1,
-  url: "/api/library/projects/1/epub/file",
+  url: "/api/library/groups/1/epub/file",
   created_at: "2026-10-06T12:00:00Z",
   sha256: "digest",
-  compiler_version: "logos-epub-1",
+  source_sha256: "snapshot", is_current: true, compiler_version: "logos-epub-1",
 };
 beforeEach(() => {
   request.mockReset();
@@ -28,7 +28,7 @@ it("generates the EPUB and then offers its private download", async () => {
   const onChange = vi.fn();
   const { rerender } = render(
     <ProjectExport
-      projectId={1}
+      groupId={1}
       artifact={null}
       hasContent
       onChange={onChange}
@@ -37,11 +37,11 @@ it("generates the EPUB and then offers its private download", async () => {
   await userEvent
     .setup()
     .click(screen.getByRole("button", { name: "Gerar EPUB" }));
-  expect(request).toHaveBeenCalledWith("projects/1/epub", "POST");
+  expect(request).toHaveBeenCalledWith("groups/1/epub", "POST");
   expect(onChange).toHaveBeenCalledWith(artifact);
   rerender(
     <ProjectExport
-      projectId={1}
+      groupId={1}
       artifact={artifact}
       hasContent
       onChange={onChange}
@@ -62,7 +62,7 @@ it("retains the last download on a failed regeneration and permits retry", async
   const onChange = vi.fn();
   render(
     <ProjectExport
-      projectId={1}
+      groupId={1}
       artifact={artifact}
       hasContent
       onChange={onChange}
@@ -86,7 +86,7 @@ it("confirms deletion and preserves the EPUB when cancelled", async () => {
   const onChange = vi.fn();
   render(
     <ProjectExport
-      projectId={1}
+      groupId={1}
       artifact={artifact}
       hasContent
       onChange={onChange}
@@ -117,7 +117,7 @@ it("deletes only after confirmation and updates the empty export state", async (
   const onChange = vi.fn();
   const view = render(
     <ProjectExport
-      projectId={1}
+      groupId={1}
       artifact={artifact}
       hasContent
       onChange={onChange}
@@ -134,12 +134,12 @@ it("deletes only after confirmation and updates the empty export state", async (
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
   await user.keyboard("{Escape}");
   expect(screen.getByRole("dialog")).toBeVisible();
-  expect(request).toHaveBeenCalledWith("projects/1/epub", "DELETE");
+  expect(request).toHaveBeenCalledWith("groups/1/epub", "DELETE");
   await act(async () => complete());
   expect(onChange).toHaveBeenCalledWith(null);
   view.rerender(
     <ProjectExport
-      projectId={1}
+      groupId={1}
       artifact={null}
       hasContent
       onChange={onChange}
@@ -162,7 +162,7 @@ it("preserves the last artifact when deletion fails and allows retry", async () 
   const onChange = vi.fn();
   render(
     <ProjectExport
-      projectId={1}
+      groupId={1}
       artifact={artifact}
       hasContent
       onChange={onChange}

@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -9,7 +10,7 @@ import {
 } from "react";
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
-import type { Project, ProjectContent, Text, EpubArtifact } from "./types";
+import type { Project, ProjectContent, Text, TextGroup, EpubArtifact } from "./types";
 import type { EpubImportJob } from "./import-types";
 export type ProjectEditorOptions = {
   projectId: string;
@@ -46,6 +47,9 @@ export function useProjectEditor({
   const [moving, setMoving] = useState(false);
   const drag = useRef<number | null>(null);
   const order = useRef<number[]>([]);
+  const groupRef = useRef<number | null>(null);
+  const loadSequence = useRef(0);
+  const contentPath = useCallback(() => `projects/${projectId}/content${groupRef.current ? `?group=${groupRef.current}` : ""}`, [projectId]);
   const dirty = selected
     ? title !== selected.title || body !== selected.markdown
     : Boolean(title || body);
@@ -83,15 +87,23 @@ export function useProjectEditor({
 
   useEffect(() => {
     let active = true;
-    libraryRequest<ProjectContent>(`projects/${projectId}/content`)
+    async function initialContent() {
+      groupRef.current = initialTextId
+        ? (await libraryRequest<Text>(`texts/${initialTextId}`)).group
+        : Number(new URLSearchParams(window.location.search).get("group")) || null;
+      return libraryRequest<ProjectContent>(contentPath());
+    }
+    initialContent()
       .then((content) => {
         if (!active) return;
+        groupRef.current = content.group.id;
         setData(content);
         const first =
           content.texts.find((text) => text.id === initialTextId) ?? null;
         setSelected(first);
         setTitle(first?.title ?? "");
         setBody(first?.markdown ?? "");
+        if (initialView === "book") void libraryRequest<{markdown: string}>(`groups/${content.group.id}/markdown`).then((result) => { if (active) setBook(result.markdown); }).catch((reason) => { if (active) setError(errorMessage(reason)); });
         if (initialTextId && !first) {
           setError("Texto não encontrado neste projeto.");
           setView("overview");
@@ -105,31 +117,20 @@ export function useProjectEditor({
         .then(refreshLibrary)
         .catch(() => {});
     }
-    if (initialView === "book") {
-      void libraryRequest<{ markdown: string }>(
-        `projects/${projectId}/markdown`,
-      )
-        .then((result) => {
-          if (active) setBook(result.markdown);
-        })
-        .catch((reason) => {
-          if (active) setError(errorMessage(reason));
-        });
-    }
     return () => {
       active = false;
     };
-  }, [projectId, initialTextId, initialView, refreshLibrary]);
+  }, [projectId, initialTextId, initialView, refreshLibrary, contentPath]);
 
   useEffect(() => {
     function reload() {
-      void libraryRequest<ProjectContent>(`projects/${projectId}/content`)
+      void libraryRequest<ProjectContent>(contentPath())
         .then(setData)
         .catch((reason) => setError(errorMessage(reason)));
     }
     window.addEventListener("logos:library-change", reload);
     return () => window.removeEventListener("logos:library-change", reload);
-  }, [projectId]);
+  }, [contentPath]);
 
   useEffect(() => {
     if (!dirty && !importPending) return;
@@ -160,9 +161,10 @@ export function useProjectEditor({
 
   async function refresh(id: number | null) {
     const content = await libraryRequest<ProjectContent>(
-      `projects/${projectId}/content`,
+      contentPath(),
     );
     setData(content);
+    if (initialView === "book") setBook((await libraryRequest<{markdown: string}>(`groups/${content.group.id}/markdown`)).markdown);
     choose(content.texts.find((text) => text.id === id) ?? null);
   }
 
@@ -177,13 +179,13 @@ export function useProjectEditor({
         {
           title,
           markdown: body,
-          ...(!selected ? { project: Number(projectId) } : {}),
+          ...(!selected ? { group: data?.group.id } : {}),
         },
       );
       // Mark the saved draft immediately; retain it even if a list refresh fails.
       setSelected(saved);
       const content = await libraryRequest<ProjectContent>(
-        `projects/${projectId}/content`,
+        contentPath(),
       );
       setData(content);
       setNotice("Salvo");
@@ -238,44 +240,56 @@ export function useProjectEditor({
     }
   }
 
-  async function projectAction(action: "duplicate" | "new-version" | "delete") {
+  async function projectAction(action: "duplicate" | "delete") {
     if (!data || !canLeave()) return;
-    if (
-      action === "new-version" &&
-      !window.confirm(
-        "Criar uma nova versão principal vazia? O conteúdo atual ficará na versão anterior.",
-      )
-    )
-      return;
-    if (
-      action === "delete" &&
-      !window.confirm(
-        data.project.is_principal
-          ? "Excluir o projeto, todas as versões, textos e arquivos?"
-          : "Excluir esta versão e seus textos? A versão principal será preservada.",
-      )
-    )
-      return;
-    setPending(true);
-    setError("");
+    if (action === "delete" && !window.confirm("Excluir o livro, todos os grupos, textos e arquivos?")) return;
+    setPending(true); setError("");
     try {
       if (action === "delete") {
         await libraryRequest(`projects/${projectId}`, "DELETE");
-        await refreshLibrary();
-        router.push("/");
+        await refreshLibrary(); router.push("/");
       } else {
-        const project = await libraryRequest<Project>(
-          `projects/${projectId}/${action}`,
-          "POST",
-        );
-        await refreshLibrary();
-        router.push(`/projects/${project.id}`);
+        const project = await libraryRequest<Project>(`projects/${projectId}/duplicate`, "POST");
+        await refreshLibrary(); router.push(`/projects/${project.id}`);
       }
-    } catch (reason) {
-      setError(errorMessage(reason));
-    } finally {
-      setPending(false);
-    }
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { setPending(false); }
+  }
+
+  async function selectGroup(id: number) {
+    if (!canLeave()) return;
+    const sequence = ++loadSequence.current;
+    setPending(true); setError("");
+    try {
+      const content = await libraryRequest<ProjectContent>(`projects/${projectId}/content?group=${id}`);
+      if (sequence !== loadSequence.current) return;
+      groupRef.current = content.group.id; setData(content); choose(null);
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { if (sequence === loadSequence.current) setPending(false); }
+  }
+
+  async function groupAction(action: "create" | "duplicate" | "default" | "delete" | "rename" | "settings", name?: string, settings?: Partial<TextGroup>) {
+    if (!data || !canLeave()) return;
+    if (action === "delete" && !window.confirm("Excluir este grupo, seus textos e seu EPUB? Os arquivos do livro serão mantidos.")) return;
+    setPending(true); setError("");
+    try {
+      let id = data.group.id;
+      if (action === "create") {
+        id = (await libraryRequest<TextGroup>("groups", "POST", { project: data.project.id, name })).id;
+      } else if (action === "duplicate") {
+        id = (await libraryRequest<TextGroup>(`groups/${id}/duplicate`, "POST", { name })).id;
+      } else if (action === "rename" || action === "settings") {
+        await libraryRequest(`groups/${id}`, "PATCH", action === "settings" ? settings : { name });
+      } else if (action === "default") {
+        await libraryRequest(`groups/${id}/default`, "POST");
+      } else {
+        await libraryRequest(`groups/${id}`, "DELETE");
+        id = data.project.default_group;
+      }
+      groupRef.current = id;
+      await refresh(null); await refreshLibrary();
+    } catch (reason) { setError(errorMessage(reason)); throw reason; }
+    finally { setPending(false); }
   }
 
   async function saveProperties(event: FormEvent<HTMLFormElement>) {
@@ -324,7 +338,7 @@ export function useProjectEditor({
           ? (await libraryRequest<Project>("projects/inbox", "POST")).id
           : Number(destination);
       await libraryRequest(`texts/${selected.id}/move`, "POST", {
-        project: target,
+        ...(destination.startsWith("group:") ? {group: Number(destination.slice(6))} : {project: target}),
       });
       await refreshLibrary();
       setMoving(false);
@@ -378,14 +392,14 @@ export function useProjectEditor({
     drag.current = null;
     setError("");
     try {
-      await libraryRequest(`projects/${projectId}/reorder`, "POST", {
+      await libraryRequest(`groups/${data?.group.id}/reorder`, "POST", {
         ids: order.current,
       });
     } catch (reason) {
       setError(errorMessage(reason));
       try {
         setData(
-          await libraryRequest<ProjectContent>(`projects/${projectId}/content`),
+          await libraryRequest<ProjectContent>(contentPath()),
         );
       } catch {
         /* Keep editor draft. */
@@ -401,7 +415,7 @@ export function useProjectEditor({
     if (to < 0 || to >= ids.length) return;
     [ids[from], ids[to]] = [ids[to], ids[from]];
     try {
-      await libraryRequest(`projects/${projectId}/reorder`, "POST", { ids });
+      await libraryRequest(`groups/${data?.group.id}/reorder`, "POST", { ids });
       setData(
         (current) =>
           current && {
@@ -425,7 +439,7 @@ export function useProjectEditor({
       await copy(
         (
           await libraryRequest<{ markdown: string }>(
-            `projects/${projectId}/markdown`,
+            `groups/${data?.group.id}/markdown`,
           )
         ).markdown,
       );
@@ -436,34 +450,20 @@ export function useProjectEditor({
 
   function updateCover(updated: Project) {
     setData((current) => current && { ...current, project: updated });
-    void libraryRequest<ProjectContent>(`projects/${projectId}/content`)
+    void libraryRequest<ProjectContent>(contentPath())
       .then(setData)
       .catch((reason) => setError(errorMessage(reason)));
     void refreshLibrary();
   }
 
-  async function restoreProject() {
-    if (!canLeave() || !window.confirm("Restaurar esta versão como principal?"))
-      return;
-    setPending(true);
-    setError("");
-    try {
-      await libraryRequest(`projects/${projectId}/restore`, "POST");
-      await refresh(selected?.id ?? null);
-      await refreshLibrary();
-    } catch (reason) {
-      setError(errorMessage(reason));
-    } finally {
-      setPending(false);
-    }
-  }
   function updateEpub(epub: EpubArtifact | null) {
     setData((current) => current && { ...current, epub });
   }
   function updateImport(job: EpubImportJob) {
     setData((current) => current && { ...current, imports: [job, ...(current.imports ?? []).filter((item) => item.id !== job.id)] });
   }
-  async function refreshAfterImport() {
+  async function refreshAfterImport(groupId?: number) {
+    if (groupId) groupRef.current = groupId;
     await refresh(null);
     await refreshLibrary();
   }
@@ -498,7 +498,8 @@ export function useProjectEditor({
     dragOver,
     finishDrag,
     keyboardOrder,
-    restoreProject,
+    selectGroup,
+    groupAction,
     updateEpub,
     updateImport,
     refreshAfterImport,

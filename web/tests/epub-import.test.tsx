@@ -1,3 +1,4 @@
+import { group } from "./group-fixture";
 import { useState } from "react";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -21,7 +22,7 @@ const job: EpubImportJob = {
   ] }, clean_report: {},
 };
 const preview: ExtractionPreview = {
-  project: 1, source: "original", source_sha256: "original-hash", project_state: "project-hash",
+  group: 1, source: "original", source_sha256: "original-hash", group_state: "project-hash",
   existing_text_count: 0, existing_primary_count: 0, requires_confirmation: false, warnings: [],
   sections: [
     { href: "first.xhtml", title: "Primeiro", position: 0, markdown: "# Primeiro\n\nTexto para revisar" },
@@ -30,7 +31,7 @@ const preview: ExtractionPreview = {
 };
 function Harness({ initialJobs = [job] }: { initialJobs?: EpubImportJob[] }) {
   const [jobs, setJobs] = useState(initialJobs);
-  return <ProjectEpubs projectId={1} jobs={jobs}
+  return <ProjectEpubs groupId={1} groups={[group]} projectId={1} jobs={jobs}
     onJob={(value) => setJobs((current) => [value, ...current.filter((item) => item.id !== value.id)])}
     onExtracted={mocks.extracted} onBusy={mocks.busy} />;
 }
@@ -79,12 +80,12 @@ it("reviews original sections before cleaning and preserves the last successful 
 it("previews the original and requires a choice and confirmation before replacing existing texts", async () => {
   const user = userEvent.setup();
   const existing = { ...preview, requires_confirmation: true, existing_text_count: 3, existing_primary_count: 2 };
-  mocks.request.mockImplementation((path: string) => path.includes("preview?") ? Promise.resolve(existing) : Promise.resolve({ text_ids: [4, 5], reused: false }));
+  mocks.request.mockImplementation((path: string) => path.includes("preview?") ? Promise.resolve(existing) : Promise.resolve({ group: 1, text_ids: [4, 5], reused: false }));
   render(<Harness />);
   await user.click(screen.getByRole("button", { name: "Extrair do original" }));
   const dialog = await screen.findByRole("dialog", { name: "Extrair textos do original" });
-  await within(dialog).findByText(/Este projeto já tem 3 textos/);
-  const button = within(dialog).getByRole("button", { name: "Extrair textos para este projeto" });
+  await within(dialog).findByText(/Este grupo já tem 3 textos/);
+  const button = within(dialog).getByRole("button", { name: "Extrair textos" });
   expect(button).toBeDisabled();
   await user.click(within(dialog).getByRole("button", { name: "Segundo" }));
   expect(within(dialog).getByRole("article")).toHaveTextContent("Outro texto");
@@ -94,7 +95,7 @@ it("previews the original and requires a choice and confirmation before replacin
   await user.click(replace);
   await waitFor(() => expect(mocks.extracted).toHaveBeenCalledOnce());
   expect(mocks.request).toHaveBeenCalledWith("epub-imports/job-1/extract", "POST", {
-    project: 1, source: "original", source_sha256: "original-hash", project_state: "project-hash", mode: "replace", confirm_existing: true,
+    group: 1, source: "original", source_sha256: "original-hash", group_state: "project-hash", mode: "replace", confirm_existing: true,
   });
 });
 
@@ -103,19 +104,19 @@ it("invalidates confirmation on conflict and sends the cleaned source after revi
   const clean = { ...job, clean_url: "/clean", clean_filename: "clean.epub", clean_sha256: "clean-hash" };
   let revision = 0;
   mocks.request.mockImplementation((path: string) => path.includes("preview?")
-    ? Promise.resolve({ ...preview, source: "cleaned", source_sha256: "clean-hash", project_state: `state-${++revision}`, requires_confirmation: true, existing_text_count: 1, existing_primary_count: 1 })
+    ? Promise.resolve({ ...preview, source: "cleaned", source_sha256: "clean-hash", group_state: `state-${++revision}`, requires_confirmation: true, existing_text_count: 1, existing_primary_count: 1 })
     : Promise.reject(new ApiError("O projeto mudou", 409)));
   render(<Harness initialJobs={[clean]} />);
   await user.click(screen.getByRole("button", { name: "Extrair do limpo" }));
   const dialog = screen.getByRole("dialog", { name: "Extrair textos do EPUB limpo" });
   await user.click(await within(dialog).findByRole("radio", { name: "Acrescentar ao final, mantendo os textos existentes" }));
-  await user.click(await within(dialog).findByRole("button", { name: "Extrair textos para este projeto" }));
+  await user.click(await within(dialog).findByRole("button", { name: "Extrair textos" }));
   await within(dialog).findByText("O projeto mudou");
-  expect(within(dialog).getByRole("button", { name: "Extrair textos para este projeto" })).toBeDisabled();
+  expect(within(dialog).getByRole("button", { name: "Extrair textos" })).toBeDisabled();
   await user.click(within(dialog).getByRole("button", { name: "Atualizar prévia" }));
   await waitFor(() => expect(within(dialog).getByRole("radio", { name: "Acrescentar ao final, mantendo os textos existentes" })).not.toBeChecked());
-  expect(within(dialog).getByRole("button", { name: "Extrair textos para este projeto" })).toBeDisabled();
-  expect(mocks.request).toHaveBeenCalledWith("epub-imports/job-1/preview?project=1&source=cleaned");
+  expect(within(dialog).getByRole("button", { name: "Extrair textos" })).toBeDisabled();
+  expect(mocks.request).toHaveBeenCalledWith("epub-imports/job-1/preview?source=cleaned&group=1");
   expect(mocks.request.mock.calls.find((call) => call[0].endsWith("/extract"))?.[2].source).toBe("cleaned");
 });
 
@@ -126,13 +127,13 @@ it("keeps processing dialogs open, blocks repeated extraction and discards late 
   const view = render(<Harness />);
   await user.click(screen.getByRole("button", { name: "Extrair do original" }));
   const dialog = screen.getByRole("dialog");
-  await user.click(await within(dialog).findByRole("button", { name: "Extrair textos para este projeto" }));
+  await user.click(await within(dialog).findByRole("button", { name: "Extrair textos" }));
   expect(within(dialog).getByRole("button", { name: "Extraindo textos…" })).toBeDisabled();
   await user.keyboard("{Escape}");
   expect(dialog).toBeVisible();
   expect(mocks.busy).toHaveBeenLastCalledWith(true);
   view.unmount();
-  await act(async () => { complete({ text_ids: [1, 2], reused: false }); });
+  await act(async () => { complete({ group: 1, text_ids: [1, 2], reused: false }); });
   expect(mocks.extracted).not.toHaveBeenCalled();
   expect(mocks.request.mock.calls.filter((call) => call[0].endsWith("/extract"))).toHaveLength(1);
 });
@@ -152,10 +153,10 @@ it("shows a persisted error as a short message and copies its technical report",
 it("does not repeat extraction when refreshing a successful result fails", async () => {
   const user = userEvent.setup();
   mocks.extracted.mockRejectedValue(new Error("offline"));
-  mocks.request.mockImplementation((path: string) => Promise.resolve(path.includes("preview?") ? preview : { text_ids: [4, 5], reused: false }));
+  mocks.request.mockImplementation((path: string) => Promise.resolve(path.includes("preview?") ? preview : { group: 1, text_ids: [4, 5], reused: false }));
   render(<Harness />);
   await user.click(screen.getByRole("button", { name: "Extrair do original" }));
-  await user.click(await screen.findByRole("button", { name: "Extrair textos para este projeto" }));
+  await user.click(await screen.findByRole("button", { name: "Extrair textos" }));
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Os textos foram extraídos, mas a atualização da tela falhou"));
   expect(await screen.findByRole("status")).toHaveTextContent("2 textos extraídos");
   expect(mocks.request.mock.calls.filter((call) => call[0].endsWith("/extract"))).toHaveLength(1);
@@ -169,7 +170,7 @@ it("selects the correct imported file when a project has several sources", async
   await user.click(screen.getByRole("combobox", { name: "EPUB de origem" }));
   await user.click(await screen.findByRole("option", { name: "outro.epub" }));
   await user.click(screen.getByRole("button", { name: "Extrair do original" }));
-  expect(mocks.request).toHaveBeenCalledWith("epub-imports/job-2/preview?project=1&source=original");
+  expect(mocks.request).toHaveBeenCalledWith("epub-imports/job-2/preview?source=original&group=1");
 });
 
 it("makes the technical text selectable when clipboard copying is unavailable", async () => {

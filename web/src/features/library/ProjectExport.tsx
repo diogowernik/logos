@@ -7,7 +7,6 @@ import type { EpubArtifact } from "./types";
 import Stack from "@mui/material/Stack";
 import {
   ProjectPanelToolbar,
-  ProjectPlannedTools,
   ProjectFileRow,
   ProjectFileInfo,
   ProjectFileName,
@@ -25,14 +24,14 @@ import {
 } from "@/components/ui/HeaderControls";
 
 export function ProjectExport({
-  projectId,
+  groupId,
   artifact,
   hasContent,
   onChange,
   blocked = false,
   onBusy,
 }: {
-  projectId: number;
+  groupId: number;
   artifact: EpubArtifact | null;
   hasContent: boolean;
   onChange: (artifact: EpubArtifact | null) => void;
@@ -51,7 +50,7 @@ export function ProjectExport({
     setPending(true);
     setError("");
     try {
-      await libraryRequest(`projects/${projectId}/epub`, "DELETE");
+      await libraryRequest(`groups/${groupId}/epub`, "DELETE");
       onChange(null);
       setConfirmDelete(false);
     } catch (reason) {
@@ -67,7 +66,7 @@ export function ProjectExport({
     try {
       onChange(
         await libraryRequest<EpubArtifact>(
-          `projects/${projectId}/epub`,
+          `groups/${groupId}/epub`,
           "POST",
         ),
       );
@@ -98,6 +97,7 @@ export function ProjectExport({
         </HeaderActions>
       </ProjectPanelToolbar>
       {error && !confirmDelete && <Alert severity="error">{error}</Alert>}
+      {artifact && !artifact.is_current && <Alert severity="info">Os textos ou informações mudaram desde a geração deste EPUB.</Alert>}
       {artifact ? (
         <ProjectFileRow>
           <ProjectFileInfo>
@@ -134,14 +134,6 @@ export function ProjectExport({
       ) : (
         <Typography color="text.secondary">Nenhum EPUB gerado.</Typography>
       )}
-      <ProjectPlannedTools>
-        <Typography component="h3" variant="body2" color="text.secondary">
-          Histórico de gerações
-        </Typography>
-        <HeaderActions>
-          <Button disabled>Ver gerações anteriores (em planejamento)</Button>
-        </HeaderActions>
-      </ProjectPlannedTools>
       <Dialog
         open={confirmDelete}
         onClose={pending ? undefined : () => setConfirmDelete(false)}

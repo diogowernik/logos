@@ -1,3 +1,4 @@
+import { group } from "./group-fixture";
 import { render } from "./render";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -22,12 +23,11 @@ import { OpenText } from "@/features/library/OpenText";
 
 const project = {
   id: 1,
-  family_id: 1,
   title: "Meu projeto",
   subtitle: "",
   author: "",
   collection: null,
-  is_principal: true,
+  default_group: 1,
   is_inbox: false,
   text_count: 1,
   updated_at: "",
@@ -35,21 +35,21 @@ const project = {
 const text = {
   id: 2,
   project: 1,
-  title: "Ideia",
+  group: 1,  title: "Ideia",
   markdown: "Primeiro texto",
   compiled_markdown: "## Ideia\n\nPrimeiro texto",
   parent: null,
   position: 0,
 };
-const content = { project, texts: [text], versions: [project] };
+const content = { project, texts: [text], group, groups: [group] };
 
 function defaults(path: string) {
   return Promise.resolve(
-    path.endsWith("content")
+    path.includes("/content")
       ? content
       : path === "projects"
         ? [project]
-        : path === "texts/2/open"
+        : (path === "texts/2/open" || path === "texts/2")
           ? text
           : [],
   );
@@ -269,7 +269,7 @@ it("keeps identity in overview and copies the ordered Markdown from the Texts ta
   const texts = screen.getByRole("tabpanel", { name: "Textos" });
   await user.click(within(texts).getByRole("button", { name: "Copiar todos os textos" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(compilation));
-  expect(mocks.request).toHaveBeenCalledWith("projects/1/markdown");
+  expect(mocks.request).toHaveBeenCalledWith("groups/1/markdown");
   expect(within(texts).getByRole("status")).toHaveTextContent("Markdown copiado");
   expect(mocks.router.push).not.toHaveBeenCalled();
 });
@@ -288,7 +288,7 @@ it("reads the same compilation used for copying", async () => {
     </LibraryShell>,
   );
   expect(await screen.findByRole("heading", { name: "Ideia" })).toBeVisible();
-  expect(mocks.request).toHaveBeenCalledWith("projects/1/markdown");
+  expect(mocks.request).toHaveBeenCalledWith("groups/1/markdown");
 });
 
 it("starts a loose draft without creating an empty text, then saves and opens it", async () => {
@@ -302,8 +302,8 @@ it("starts a loose draft without creating an empty text, then saves and opens it
     Promise.resolve(
       path === "projects/inbox"
         ? looseProject
-        : path.endsWith("content")
-          ? { project: looseProject, texts: [], versions: [looseProject] }
+        : path.includes("/content")
+          ? { project: looseProject, texts: [], group, groups: [group] }
           : method === "POST" && path === "texts"
             ? { ...text, id: 10, project: 9 }
             : [],
@@ -325,7 +325,7 @@ it("starts a loose draft without creating an empty text, then saves and opens it
   await user.type(input, "Ideia livre");
   await user.click(screen.getByRole("button", { name: "Salvar" }));
   expect(mocks.request).toHaveBeenCalledWith("texts", "POST", {
-    project: 9,
+    group: 1,
     title: "",
     markdown: "Ideia livre",
   });
@@ -387,7 +387,7 @@ it("opens the right panel empty in the library and removes the editor preview on
 it("reorders primary chapters with the keyboard without saving editor content", async () => {
   const second = { ...text, id: 3, title: "Segunda ideia", position: 1 };
   mocks.request.mockImplementation((path: string) =>
-    path.endsWith("content")
+    path.includes("/content")
       ? Promise.resolve({ ...content, texts: [text, second] })
       : defaults(path),
   );
@@ -400,7 +400,7 @@ it("reorders primary chapters with the keyboard without saving editor content", 
   const handle = await screen.findByRole("button", { name: "Reordenar Ideia" });
   handle.focus();
   await userEvent.setup().keyboard("{ArrowDown}");
-  expect(mocks.request).toHaveBeenCalledWith("projects/1/reorder", "POST", {
+  expect(mocks.request).toHaveBeenCalledWith("groups/1/reorder", "POST", {
     ids: [3, 2],
   });
   expect(mocks.request).not.toHaveBeenCalledWith(

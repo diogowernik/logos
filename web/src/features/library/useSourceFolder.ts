@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { libraryRequest } from "./api";
 import type { SourceFile } from "./source-types";
-export function useSourceFolder(projectId: number, kind: "markdown" | "epub", onBusy: (busy: boolean) => void) {
+export function useSourceFolder(projectId: number, kind: "markdown" | "epub", onBusy: (busy: boolean) => void, groupId?: number) {
     const [files, setFiles] = useState<SourceFile[]>([]);
     const [loading, setLoading] = useState(true);
     const [pending, setPending] = useState("");
@@ -11,7 +11,7 @@ export function useSourceFolder(projectId: number, kind: "markdown" | "epub", on
     const mounted = useRef(false);
     const running = useRef(false);
     const revision = useRef(0);
-    const endpoint = `projects/${projectId}/${kind === "markdown" ? "markdown-files" : "local-epubs"}`;
+    const endpoint = `projects/${projectId}/${kind === "markdown" ? "markdown-files" : "local-epubs"}${groupId ? `?group=${groupId}` : ""}`;
     const refresh = useCallback(async () => {
         const requestId = ++revision.current;
         const result = await libraryRequest<SourceFile[]>(endpoint);

@@ -21,6 +21,7 @@ import {
   LibrarySearchGroup,
 } from "@/theme/library";
 import { useLibrary } from "./LibraryShell";
+import { textLocation } from "./text-location";
 import { libraryRequest, errorMessage } from "./api";
 import type { Project, TextSummary } from "./types";
 
@@ -161,7 +162,7 @@ export function LibrarySearch({
                     </ListItemIcon>
                     <ListItemText
                       primary={text.title || "Sem título"}
-                      secondary={text.is_loose ? undefined : text.project_title}
+                      secondary={textLocation(text)}
                     />
                   </ListItemButton>
                 ))}

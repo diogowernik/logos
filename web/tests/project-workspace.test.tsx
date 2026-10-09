@@ -1,3 +1,4 @@
+import { group } from "./group-fixture";
 import { render } from "./render";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -25,12 +26,11 @@ import { ProjectEditor } from "@/features/library/ProjectEditor";
 
 const project = {
   id: 1,
-  family_id: 1,
   title: "Livro A",
   subtitle: "",
   author: "",
   collection: 7,
-  is_principal: true,
+  default_group: 1,
   is_inbox: false,
   text_count: 2,
   updated_at: "",
@@ -41,7 +41,7 @@ const chapters = [
   {
     id: 2,
     project: 1,
-    parent: null,
+  group: 1,    parent: null,
     title: "Capítulo A",
     markdown: "# Capítulo A\n\nTexto A",
     position: 0,
@@ -49,7 +49,7 @@ const chapters = [
   {
     id: 3,
     project: 1,
-    parent: null,
+  group: 1,    parent: null,
     title: "Capítulo B",
     markdown: "Texto B",
     position: 1,
@@ -65,28 +65,56 @@ const asset = {
 const content: ProjectContent = {
   project,
   texts: chapters,
-  versions: [project],
+  group, groups: [group],
   assets: [asset],
   epub: null,
 };
 const artifact = {
   filename: "livro-a.epub",
-  url: "/api/library/projects/1/epub/file",
+  url: "/api/library/groups/1/epub/file",
   created_at: "2026-10-08T12:00:00Z",
   sha256: "digest",
-  compiler_version: "logos-epub-1",
+  source_sha256: "snapshot", is_current: true, compiler_version: "logos-epub-1",
   generation: 1,
 };
 let current: ProjectContent;
 
+it("creates and selects an independent group without switching the book default", async () => {
+  const user = userEvent.setup();
+  mocks.request.mockImplementation((path, method, body) => {
+    if (path === "groups" && method === "POST") {
+      const newGroup = {...group, id: 8, name: body.name, is_default: false};
+      current = {...content, group: newGroup, groups: [group, newGroup], texts: []};
+      return Promise.resolve(newGroup);
+    }
+    if (path === "projects/1/content?group=1") current = {...current, group, texts: chapters};
+    return defaults(path, method, body);
+  });
+  render(<LibraryShell><ProjectEditor projectId="1" /></LibraryShell>);
+  await user.click(await screen.findByLabelText("Opções do grupo"));
+  await user.click(screen.getByRole("menuitem", {name: "Novo grupo vazio"}));
+  const dialog = screen.getByRole("dialog");
+  await user.type(within(dialog).getByLabelText(/Nome/), "Revisão humana");
+  await user.click(within(dialog).getByRole("button", {name: "Salvar"}));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("projects/1/content?group=8"));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(current.project.default_group).toBe(1);
+  expect(mocks.request.mock.calls.some(([path]) => path.endsWith("/default"))).toBe(false);
+  await user.click(screen.getByRole("combobox", {name: "Grupo de textos"}));
+  await user.click(screen.getByRole("option", {name: "Textos · padrão"}));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("projects/1/content?group=1"));
+  expect(await screen.findByRole("combobox", {name: "Grupo de textos"})).toHaveTextContent("Textos · padrão");
+});
+
 function defaults(path: string, method?: string, body?: { cover?: string }) {
+  if (path === "texts/2") return Promise.resolve(chapters[0]);
   if (path === "projects") return Promise.resolve([current.project]);
   if (path === "collections")
     return Promise.resolve([
       { id: 7, title: "Coleção A", description: "", position: 0 },
     ]);
-  if (path === "projects/1/content") return Promise.resolve(current);
-  if (path === "projects/1/epub" && method === "POST") {
+  if (path.startsWith("projects/1/content")) return Promise.resolve(current);
+  if (path === "groups/1/epub" && method === "POST") {
     current = { ...current, epub: artifact };
     return Promise.resolve(artifact);
   }
@@ -140,11 +168,11 @@ it("opens the protected project route in the center with its operations and an e
   ).toHaveAttribute("href", "/texts/2");
   expect(
     within(panel).getByRole("link", { name: "+ Adicionar texto" }),
-  ).toHaveAttribute("href", "/projects/1/new");
+  ).toHaveAttribute("href", "/projects/1/new?group=1");
   const user = userEvent.setup();
   within(panel).getByRole("button", { name: "Reordenar Capítulo A" }).focus();
   await user.keyboard("{ArrowDown}");
-  expect(mocks.request).toHaveBeenCalledWith("projects/1/reorder", "POST", {
+  expect(mocks.request).toHaveBeenCalledWith("groups/1/reorder", "POST", {
     ids: [3, 2],
   });
   expect(
@@ -231,16 +259,17 @@ it("keeps the central book workspace while panels collapse and opens the existin
 });
 
 it("ignores a late response from the previously selected book", async () => {
-  const other = { ...project, id: 9, title: "Livro novo", family_id: 9 };
+  const other = { ...project, id: 9, title: "Livro novo", default_group: 9 };
   let completeOld!: (value: ProjectContent) => void;
   mocks.request.mockImplementation((path: string) => {
-    if (path === "projects") return Promise.resolve([project, other]);
-    if (path === "projects/1/content")
+    if (path === "texts/2") return Promise.resolve(chapters[0]);
+  if (path === "projects") return Promise.resolve([project, other]);
+    if (path.startsWith("projects/1/content"))
       return new Promise((resolve) => {
         completeOld = resolve;
       });
-    if (path === "projects/9/content")
-      return Promise.resolve({ project: other, texts: [], versions: [other] });
+    if (path.startsWith("projects/9/content"))
+      return Promise.resolve({ project: other, texts: [], group: {...group, id: 9, project: 9}, groups: [{...group, id: 9, project: 9}] });
     return defaults(path);
   });
   const view = render(
@@ -364,10 +393,10 @@ it("opens overview first and separates tasks and labels future tools without mak
     ),
   ).toBeEnabled();
   expect(
-    screen.getByRole("button", {
+    screen.queryByRole("button", {
       name: "Ver gerações anteriores (em planejamento)",
     }),
-  ).toBeDisabled();
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByRole("link", { name: "Baixar EPUB" }),
   ).not.toBeInTheDocument();
@@ -377,7 +406,7 @@ it("preserves an in-flight generation and its failure when switching tabs", asyn
   current = { ...content, epub: artifact };
   let rejectGeneration!: (error: Error) => void;
   mocks.request.mockImplementation((path: string, method?: string) => {
-    if (path === "projects/1/epub" && method === "POST")
+    if (path === "groups/1/epub" && method === "POST")
       return new Promise((_, reject) => {
         rejectGeneration = reject;
       });
@@ -468,12 +497,12 @@ it("refreshes the central chapter list and files after extracting into the curre
   };
   current = { ...content, imports: [job] };
   mocks.request.mockImplementation((path: string, method?: string, body?: { cover?: string }) => {
-    if (path.includes("/preview?")) return Promise.resolve({ project: 1, source: "original", source_sha256: "hash", project_state: "state", requires_confirmation: true,
+    if (path.includes("/preview?")) return Promise.resolve({ group: 1, source: "original", source_sha256: "hash", group_state: "state", requires_confirmation: true,
       existing_text_count: 2, existing_primary_count: 2, warnings: [], sections: [{ href: "new.xhtml", title: "Extraído", position: 0, markdown: "Conteúdo extraído" }] });
     if (path === "epub-imports/import/extract") {
       current = { ...current, texts: [...chapters, { ...chapters[0], id: 44, title: "Extraído", markdown: "Conteúdo extraído", position: 2 }],
         assets: [...(current.assets ?? []), { ...asset, id: "new-image", original_name: "ilustracao.png" }] };
-      return Promise.resolve({ project: 1, source: "original", mode: "append", text_ids: [44], reused: false });
+      return Promise.resolve({ group: 1, source: "original", mode: "append", text_ids: [44], reused: false });
     }
     return defaults(path, method, body);
   });
@@ -483,7 +512,7 @@ it("refreshes the central chapter list and files after extracting into the curre
   await user.click(screen.getByRole("button", { name: "Extrair do original" }));
   const dialog = await screen.findByRole("dialog", { name: "Extrair textos do original" });
   await user.click(await within(dialog).findByRole("radio", { name: "Acrescentar ao final, mantendo os textos existentes" }));
-  await user.click(within(dialog).getByRole("button", { name: "Extrair textos para este projeto" }));
+  await user.click(within(dialog).getByRole("button", { name: "Extrair textos" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   await user.click(screen.getByRole("tab", { name: "Textos" }));
   expect(within(screen.getByRole("tabpanel", { name: "Textos" })).getByRole("link", { name: "Editar Extraído" })).toHaveAttribute("href", "/texts/44");
@@ -494,7 +523,7 @@ it("refreshes the central chapter list and files after extracting into the curre
 
 it("reads Texts laterally, keeps editing explicit and switches cleanly between Texts and Markdown", async () => {
   mocks.request.mockImplementation((path, method, body) => {
-    if (path === "projects/1/markdown-files") return Promise.resolve([{ name: "fonte.md", size: 20, sha256: "hash", status: "new" }]);
+    if (path.startsWith("projects/1/markdown-files")) return Promise.resolve([{ name: "fonte.md", size: 20, sha256: "hash", status: "new" }]);
     if (path === "projects/1/markdown-preview") return Promise.resolve({ sections: [{ markdown: "# Fonte\n\nConteúdo do arquivo" }] });
     return defaults(path, method, body);
   });
@@ -533,7 +562,7 @@ it("reads Texts laterally, keeps editing explicit and switches cleanly between T
   expect(screen.queryByRole("article")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Mostrar painel de trabalho" })).toHaveAttribute("aria-expanded", "false");
   expect(mocks.request.mock.calls.filter(([, method]) => method && method !== "GET")).toEqual([
-    ["projects/1/markdown-preview", "POST", { files: ["fonte.md"] }],
+    ["projects/1/markdown-preview", "POST", { files: ["fonte.md"], group: 1 }],
   ]);
 });
 

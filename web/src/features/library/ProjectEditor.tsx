@@ -82,7 +82,6 @@ export function ProjectEditor({
     projectAction,
     saveProperties,
     move,
-    restoreProject,
   } = editor;
   const {
     rightOpen: previewOpen,
@@ -145,33 +144,15 @@ export function ProjectEditor({
             >
               Duplicar projeto
             </MenuItem>
-            <MenuItem
-              disabled={pending}
-              onClick={() => projectAction("new-version")}
-            >
-              Nova versão principal
-            </MenuItem>
             <DestructiveMenuItem
               disabled={pending}
               onClick={() => projectAction("delete")}
             >
-              Excluir {project.is_principal ? "projeto" : "versão"}
+              Excluir projeto
             </DestructiveMenuItem>
           </ActionMenu>
         )}
       </WorkspacePath>
-      {!project.is_principal && (
-        <Alert
-          severity="info"
-          action={
-            <Button disabled={pending} onClick={restoreProject}>
-              Restaurar como principal
-            </Button>
-          }
-        >
-          Versão secundária
-        </Alert>
-      )}
       {error && !properties && !moving && (
         <Alert severity="error">{error}</Alert>
       )}
@@ -411,12 +392,13 @@ export function ProjectEditor({
                 select
                 id="move-project"
                 name="project"
-                label="Projeto de destino"
+                label="Destino"
                 required
                 defaultValue=""
                 slotProps={{ select: { native: true } }}
               >
-                <option value="">Escolha um projeto</option>
+                <option value="">Escolha um destino</option>
+                {data.groups.filter((g) => g.id !== data.group.id).map((g) => <option key={g.id} value={`group:${g.id}`}>{project.title} · {g.name}</option>)}
                 {!project.is_inbox && (
                   <option value="loose">Deixar como texto solto</option>
                 )}

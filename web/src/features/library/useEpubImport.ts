@@ -5,11 +5,12 @@ import { ApiError } from "@/api/client";
 import { libraryRequest, errorMessage } from "./api";
 import type { EpubImportJob, EpubSource, ExtractionPreview, ExtractionResult } from "./import-types";
 
-export function useEpubImport({ projectId, jobs, onJob, onExtracted, onBusy }: {
+export function useEpubImport({ projectId, groupId, jobs, onJob, onExtracted, onBusy }: {
   projectId: number;
+  groupId: number;
   jobs: EpubImportJob[];
   onJob: (job: EpubImportJob) => void;
-  onExtracted: () => Promise<void>;
+  onExtracted: (groupId?: number) => Promise<void>;
   onBusy: (busy: boolean) => void;
 }) {
   const [selectedId, setSelectedId] = useState("");
@@ -22,6 +23,9 @@ export function useEpubImport({ projectId, jobs, onJob, onExtracted, onBusy }: {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<ExtractionPreview | null>(null);
   const [source, setSource] = useState<EpubSource>("original");
+  const [target, setTarget] = useState(String(groupId));
+  const [newName, setNewName] = useState("");
+  const operationId = useRef("");
   const [stale, setStale] = useState(false);
   const mounted = useRef(false);
   const running = useRef(false);
@@ -97,14 +101,16 @@ export function useEpubImport({ projectId, jobs, onJob, onExtracted, onBusy }: {
       }
     });
   }
-  async function loadPreview(nextSource: EpubSource) {
+  async function loadPreview(nextSource: EpubSource, nextTarget = target) {
     if (!job || running.current) return;
+    if (!previewOpen) operationId.current = crypto.randomUUID();
+    setTarget(nextTarget);
     setPreviewOpen(true);
     setSource(nextSource);
     setPreview(null);
     setStale(false);
     await run("Preparando prévia…", async () => {
-      const result = await libraryRequest<ExtractionPreview>(`epub-imports/${job.id}/preview?project=${projectId}&source=${nextSource}`);
+      const result = await libraryRequest<ExtractionPreview>(`epub-imports/${job.id}/preview?source=${nextSource}${nextTarget === "new" ? "" : `&group=${nextTarget}`}`);
       if (mounted.current) setPreview(result);
     });
   }
@@ -112,14 +118,14 @@ export function useEpubImport({ projectId, jobs, onJob, onExtracted, onBusy }: {
     if (!job || !preview || stale) return;
     await run("Extraindo textos…", async () => {
       const result = await libraryRequest<ExtractionResult>(`epub-imports/${job.id}/extract`, "POST", {
-        project: preview.project, source,
-        source_sha256: preview.source_sha256, project_state: preview.project_state,
+        ...(target === "new" ? { new_group_name: newName, operation_id: operationId.current } : { group: Number(target) }), source,
+        source_sha256: preview.source_sha256, group_state: preview.group_state,
         mode, confirm_existing: confirmed,
       });
       if (!mounted.current) return;
       setPreviewOpen(false);
-      setNotice(result.reused ? "Esta extração já foi concluída; nenhum texto foi duplicado." : `${result.text_ids.length} textos extraídos para este projeto.`);
-      try { await onExtracted(); }
+      setNotice(result.reused ? "Esta extração já foi concluída; nenhum texto foi duplicado." : `${result.text_ids.length} textos extraídos para o grupo.`);
+      try { await onExtracted(result.group); }
       catch (reason) {
         if (mounted.current) setError(new Error(`Os textos foram extraídos, mas a atualização da tela falhou. Recarregue o projeto. ${errorMessage(reason)}`));
       }
@@ -132,7 +138,7 @@ export function useEpubImport({ projectId, jobs, onJob, onExtracted, onBusy }: {
       if (mounted.current) onJob(updated);
     });
   }
-  return { job, selectedId: job?.id ?? "", select, pending, error, notice, upload,
+  return { target, newName, setNewName, setTarget, job, selectedId: job?.id ?? "", select, pending, error, notice, upload,
     cleanOpen, setCleanOpen, sections, setSections, reviewClean, clean,
     previewOpen, setPreviewOpen, preview, source, stale, loadPreview, extract, refreshJob };
 }

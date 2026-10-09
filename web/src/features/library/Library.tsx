@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { textLocation } from "./text-location";
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
 import type { Collection, Project, TextSummary } from "./types";
@@ -203,7 +204,7 @@ export function Library({
                           <ListItemText
                             primary={text.title || "Sem título"}
                             secondary={
-                              !text.is_loose ? text.project_title : undefined
+                              textLocation(text)
                             }
                           />
                         </ListItemButton>

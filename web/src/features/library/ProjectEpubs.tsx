@@ -16,16 +16,18 @@ import { ImportWarnings } from "./ImportWarnings";
 import { EpubCleanDialog } from "./EpubCleanDialog";
 import { TextImportDialog } from "./TextImportDialog";
 import { ImportSourceSelect } from "@/theme/epub-import";
-export function ProjectEpubs({ projectId, jobs, onJob, onExtracted, onBusy, blocked = false, }: {
+export function ProjectEpubs({ projectId, groupId, groups, jobs, onJob, onExtracted, onBusy, blocked = false, }: {
     projectId: number;
+    groupId: number;
+    groups: import("./types").TextGroup[];
     jobs: EpubImportJob[];
     onJob: (job: EpubImportJob) => void;
-    onExtracted: () => Promise<void>;
+    onExtracted: (groupId?: number) => Promise<void>;
     onBusy: (busy: boolean) => void;
     blocked?: boolean;
 }) {
     const input = useRef<HTMLInputElement>(null);
-    const controller = useEpubImport({ projectId, jobs, onJob, onExtracted, onBusy });
+    const controller = useEpubImport({ projectId, groupId, jobs, onJob, onExtracted, onBusy });
     const { job, pending, cleanOpen, previewOpen } = controller;
     return (<ProjectEpubSections>
       <Stack component="section" spacing={1} aria-labelledby="epub-import-title">
@@ -80,7 +82,7 @@ export function ProjectEpubs({ projectId, jobs, onJob, onExtracted, onBusy, bloc
             </HeaderActions>
           </ProjectPanelToolbar>
           <EpubCleanDialog job={job} open={cleanOpen} selected={controller.sections} onSelection={controller.setSections} onClose={() => controller.setCleanOpen(false)} onClean={controller.clean} pending={pending} error={controller.error}/>
-          <TextImportDialog open={previewOpen} preview={controller.preview} source={controller.source} stale={controller.stale} pending={pending} error={controller.error} onClose={() => controller.setPreviewOpen(false)} onReload={() => controller.loadPreview(controller.source)} onExtract={controller.extract}/>
+          <TextImportDialog destination={{groups, target: controller.target, name: controller.newName, disabled: Boolean(pending), onName: controller.setNewName, onTarget: (next) => { void controller.loadPreview(controller.source, next); }}} open={previewOpen} preview={controller.preview} source={controller.source} stale={controller.stale} pending={pending} error={controller.error} onClose={() => controller.setPreviewOpen(false)} onReload={() => controller.loadPreview(controller.source)} onExtract={controller.extract}/>
         </> : <Typography variant="body2" color="text.secondary">Nenhum EPUB importado.</Typography>}
       </Stack>
       <LocalEpubs projectId={projectId} onJob={onJob} onBusy={onBusy} blocked={blocked || Boolean(pending)} onSelect={controller.select}/>

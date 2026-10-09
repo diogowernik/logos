@@ -13,12 +13,11 @@ import type { Project } from "@/features/library/types";
 
 const project: Project = {
   id: 1,
-  family_id: 1,
   title: "Livro",
   subtitle: "",
   author: "",
   collection: null,
-  is_principal: true,
+  default_group: 1,
   is_inbox: false,
   text_count: 0,
   updated_at: "",

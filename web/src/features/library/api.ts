@@ -2,7 +2,7 @@ import { apiRequest } from "@/api/client";
 
 const fieldLabels = {
   title: "Título", subtitle: "Subtítulo", author: "Autor", markdown: "Markdown",
-  project: "Projeto", collection: "Coleção", parent: "Texto principal", ids: "Ordem dos textos",
+  project: "Projeto", group: "Grupo", new_group_name: "Nome do grupo", collection: "Coleção", parent: "Texto principal", ids: "Ordem dos textos",
   image: "Imagem", cover: "Capa",
 };
 

@@ -13,16 +13,18 @@ import { useMarkdownSources } from "./useMarkdownSources";
 import { ImportFeedback } from "./ImportFeedback";
 import { TextImportDialog } from "./TextImportDialog";
 const statusLabels = { new: "", imported: "Textos já gerados", changed: "Fonte alterada após a importação", text_missing: "Texto anterior removido · revise o projeto", unregistered: "", registered: "", missing: "" };
-export function ProjectMarkdown({ projectId, blocked, onBusy, onExtracted, onRead }: {
+export function ProjectMarkdown({ projectId, groupId, groups, blocked, onBusy, onExtracted, onRead }: {
     projectId: number;
+    groupId: number;
+    groups: import("./types").TextGroup[];
     onRead: (document: ReadingDocument) => void;
     blocked: boolean;
     onBusy: (busy: boolean) => void;
-    onExtracted: () => Promise<void>;
+    onExtracted: (groupId?: number) => Promise<void>;
 }) {
     const input = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
-    const { folder, files, checked, disabled, setSelected, preview, reviewOpen, setReviewOpen, stale, upload, loadPreview, generate, reviewNames } = useMarkdownSources({ projectId, blocked, onBusy, onExtracted, onRead });
+    const { target, newName, setNewName, folder, files, checked, disabled, setSelected, preview, reviewOpen, setReviewOpen, stale, upload, loadPreview, generate, reviewNames } = useMarkdownSources({ projectId, groupId, blocked, onBusy, onExtracted, onRead });
     return <Stack component="section" spacing={2} aria-label="Fontes Markdown">
     <ProjectPanelToolbar>
       <Typography component="h2" variant="body1">Markdown</Typography>
@@ -51,6 +53,6 @@ export function ProjectMarkdown({ projectId, blocked, onBusy, onExtracted, onRea
         <Button aria-label={`Gerar texto de ${file.name}`} disabled={disabled} onClick={() => loadPreview([file.name])}>Gerar texto</Button>
       </HeaderActions>
     </ProjectFileRow>)}
-    <TextImportDialog open={reviewOpen} preview={preview} source="markdown" pending={folder.pending} stale={stale} error={folder.error} onClose={() => setReviewOpen(false)} onReload={() => loadPreview(reviewNames)} onExtract={generate}/>
+    <TextImportDialog destination={{groups, target, name: newName, disabled: Boolean(folder.pending), onName: setNewName, onTarget: (next) => { void loadPreview(reviewNames, false, next); }}} open={reviewOpen} preview={preview} source="markdown" pending={folder.pending} stale={stale} error={folder.error} onClose={() => setReviewOpen(false)} onReload={() => loadPreview(reviewNames)} onExtract={generate}/>
   </Stack>;
 }

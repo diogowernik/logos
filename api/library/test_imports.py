@@ -75,6 +75,63 @@ def mutate(content, callback, remove=()):
 
 
 class ImportEngineTests(SimpleTestCase):
+    def test_clean_keeps_pages_intentionally_absent_from_source_toc(self):
+        from bs4 import BeautifulSoup
+        original, _ = fixture()
+        clean, _ = clean_package(original)
+        package = read_package(clean)
+        nav = next(r for r in package.resources.values() if "nav" in r.properties)
+        titles = [a.get_text(" ", strip=True) for a in BeautifulSoup(nav.content, "html.parser").select("nav a")]
+        self.assertEqual(titles, ["Primeiro", "Segundo"])
+        self.assertIn("Créditos", [s["title"] for s in report(package)["sections"] if s["selected"]])
+
+    def test_navigation_outside_spine_has_distinct_label(self):
+        original, _ = fixture()
+        package = read_package(original)
+        nav = next(r for r in package.resources.values() if "nav" in r.properties)
+        package.spine.remove(nav.path)
+        section = next(s for s in report(package)["sections"] if s["kind"] == "navigation")
+        self.assertEqual(section["title"], "Sumário do leitor")
+
+    def test_selected_original_navigation_is_kept_once(self):
+        original, _ = fixture()
+        package = read_package(original)
+        inspection = report(package)
+        selected = [s["href"] for s in inspection["sections"] if s["selected"] or s["kind"] == "navigation"]
+        clean, _ = clean_package(original, selected)
+        package = read_package(clean)
+        navigation = [r for r in package.resources.values() if "nav" in r.properties]
+        self.assertEqual(len(navigation), 1)
+        self.assertIn(navigation[0].path, package.spine)
+        self.assertIn(b"#", package.resources[package.spine[-1]].content)
+
+    def test_navigation_reading_has_no_html_anchors_or_added_numbering(self):
+        from .epub_import.conversion import section_reading
+        original, _ = fixture()
+        package = read_package(original)
+        nav = next(r for r in package.resources.values() if "nav" in r.properties)
+        reading = section_reading(package, nav.path, "/resource?href=")
+        self.assertNotIn('<a id=', reading["markdown"])
+        self.assertNotRegex(reading["markdown"], r"(?m)^\d+\. ")
+        self.assertIn("Primeiro", reading["markdown"])
+
+    def test_clean_preserves_nested_toc_and_prunes_removed_destinations(self):
+        original, _ = fixture()
+        def nested(path, content):
+            if path.endswith("nav.xhtml"):
+                return b'''<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="Text/99.xhtml">Parte</a><ol><li><a href="Text/99.xhtml#a">Inicio</a></li><li><a href="Text/01.xhtml#b">Fim</a></li></ol></li></ol></nav></body></html>'''
+            return content
+        source = mutate(original, nested)
+        from bs4 import BeautifulSoup
+        for selected in (None, ["EPUB/Text/99.xhtml"]):
+            clean, _ = clean_package(source, selected)
+            package = read_package(clean)
+            nav = next(r for r in package.resources.values() if "nav" in r.properties)
+            soup = BeautifulSoup(nav.content, "html.parser")
+            self.assertTrue(soup.select("nav ol ol"))
+            self.assertTrue(soup.find("a", href=re.compile(r"#a$")))
+            self.assertEqual(bool(soup.find("a", href=re.compile(r"#b$"))), selected is None)
+
     def test_spine_order_cover_classification_and_conservative_selection(self):
         original, _ = fixture()
         inspection = report(read_package(original))
@@ -198,6 +255,19 @@ class ImportEngineTests(SimpleTestCase):
 
 
 class ImportApiTests(TestCase):
+    def test_section_reading_is_private_and_does_not_extract(self):
+        uploaded = self.upload()
+        endpoint = f"/api/library/epub-imports/{uploaded.data['id']}/section/"
+        href = next(s["href"] for s in uploaded.data["inspection"]["sections"] if s["title"] == "Primeiro")
+        response = self.client.get(endpoint, {"href": href})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Texto", response.data["markdown"])
+        self.assertIn("/resource?source=original", response.data["markdown"])
+        self.assertEqual(self.group.texts.count(), 0)
+        self.assertEqual(self.client.get(endpoint, {"href": "missing.xhtml"}).status_code, 404)
+        self.client.force_authenticate(self.other)
+        self.assertEqual(self.client.get(endpoint, {"href": href}).status_code, 404)
+
     def setUp(self):
         directory = TemporaryDirectory()
         self.addCleanup(directory.cleanup)

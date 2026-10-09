@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DeleteIcon, DownloadIcon } from "@/components/icons/NavigationIcons";
+import { createPortal } from "react-dom";
+import { DeleteIcon } from "@/components/icons/NavigationIcons";
 import { errorMessage, libraryRequest } from "./api";
 import type { EpubArtifact } from "./types";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
+import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import {
-  ProjectPanelToolbar,
+  BookExport,
   ProjectFileRow,
   ProjectFileInfo,
-  ProjectFileName,
 } from "@/theme/project";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
@@ -32,7 +31,9 @@ export function ProjectExport({
   onChange,
   blocked = false,
   onBusy,
+  actionsHost,
 }: {
+  actionsHost?: HTMLDivElement | null;
   groupId: number;
   artifact: EpubArtifact | null;
   hasContent: boolean;
@@ -79,41 +80,23 @@ export function ProjectExport({
     }
   }
 
+  const generateButton = <Button
+    disabled={pending || blocked || confirmDelete || !hasContent}
+    onClick={generate}
+  >{pending ? "Gerando EPUB…" : artifact ? "Gerar novamente" : "Gerar EPUB"}</Button>;
+
   return (
-    <Stack component="section" spacing={1} aria-label="EPUB gerado">
-      <ProjectPanelToolbar>
-        <Typography component="h3" variant="body1">
-          EPUB deste grupo
-        </Typography>
-        <HeaderActions>
-          <Button
-            disabled={pending || blocked || confirmDelete || !hasContent}
-            onClick={generate}
-          >
-            {pending
-              ? "Gerando EPUB…"
-              : artifact
-                ? "Gerar novamente"
-                : "Gerar EPUB"}
-          </Button>
-        </HeaderActions>
-      </ProjectPanelToolbar>
+    <>
+      {actionsHost ? createPortal(generateButton, actionsHost) : generateButton}
+      {(artifact || (error && !confirmDelete)) && <BookExport>
+      <Stack component="section" spacing={1} aria-label="EPUB gerado">
       {error && !confirmDelete && <Alert severity="error">{error}</Alert>}
       {artifact && !artifact.is_current && <Alert severity="info">Os textos ou informações mudaram desde a geração deste EPUB.</Alert>}
-      {artifact ? (
+      {artifact && (
         <ProjectFileRow>
           <ProjectFileInfo>
-            <ProjectFileName>{artifact.filename}</ProjectFileName>
-            <Typography variant="caption" color="text.secondary">
-              Gerado em{" "}
-              {new Date(artifact.created_at).toLocaleString("pt-BR", {
-                dateStyle: "short",
-                timeStyle: "short",
-              })}
-            </Typography>
-          </ProjectFileInfo>
-          <HeaderActions>
-            <Tooltip title="Baixar EPUB"><IconButton component="a" aria-label="Baixar EPUB" href={artifact.url} download={artifact.filename}><DownloadIcon /></IconButton></Tooltip>
+            <HeaderActions>
+            <Link aria-label="Baixar EPUB" href={artifact.url} download={artifact.filename}>{artifact.filename}</Link>
             <CompactActionButton
               label="Excluir EPUB"
               disabled={pending || blocked}
@@ -124,11 +107,19 @@ export function ProjectExport({
             >
               <DeleteIcon />
             </CompactActionButton>
-          </HeaderActions>
+            </HeaderActions>
+            <Typography variant="caption" color="text.secondary">
+              Gerado em{" "}
+              {new Date(artifact.created_at).toLocaleString("pt-BR", {
+                dateStyle: "short",
+                timeStyle: "short",
+              })}
+            </Typography>
+          </ProjectFileInfo>
         </ProjectFileRow>
-      ) : (
-        <Typography color="text.secondary">Nenhum EPUB gerado.</Typography>
       )}
+      </Stack>
+      </BookExport>}
       <Dialog
         open={confirmDelete}
         onClose={pending ? undefined : () => setConfirmDelete(false)}
@@ -153,6 +144,6 @@ export function ProjectExport({
           </Button>
         </DialogActions>
       </Dialog>
-    </Stack>
+    </>
   );
 }

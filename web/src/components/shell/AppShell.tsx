@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -55,6 +56,30 @@ export function AppShell({
   const wide = useMediaQuery("(min-width: 1280px)");
   const [leftOverride, setLeft] = useState<boolean | null>(null);
   const [rightOverrides, setRightOverrides] = useState<Record<string, boolean>>({});
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      try {
+        const saved = JSON.parse(localStorage.getItem("logos.shell.panels") || "{}");
+        const savedLeft = typeof saved?.left === "boolean" ? saved.left : null;
+        const savedRight = saved?.right && typeof saved.right === "object" && !Array.isArray(saved.right)
+          ? Object.fromEntries(Object.entries(saved.right).filter(([, value]) => typeof value === "boolean")) as Record<string, boolean>
+          : {};
+        setLeft((current) => current ?? savedLeft);
+        setRightOverrides((current) => ({ ...savedRight, ...current }));
+      } catch { /* Local preferences never block the workspace. */ }
+      setPreferencesLoaded(true);
+    });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    try {
+      localStorage.setItem("logos.shell.panels", JSON.stringify({ left: leftOverride, right: rightOverrides }));
+    } catch { /* Storage-disabled browsers still allow panel controls. */ }
+  }, [leftOverride, rightOverrides, preferencesLoaded]);
   const [rightContext, setRightContext] = useState<RightContext | null>(null);
   const rightKey = rightContext?.key ?? "default";
   const [rightHost, setHost] = useState<HTMLDivElement | null>(null);

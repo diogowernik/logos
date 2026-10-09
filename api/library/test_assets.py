@@ -15,6 +15,22 @@ from .services.projects import duplicate_project
 
 
 class ProjectCoverTests(TestCase):
+    def test_group_export_uses_project_metadata_and_cover(self):
+        original, _ = self.upload()
+        current, _ = self.upload(color="blue")
+        self.project.refresh_from_db()
+        self.project.subtitle = "Subtítulo do projeto"
+        self.project.author = "Autor do projeto"
+        self.group.project = self.project
+        self.group.export_title = "Título antigo do grupo"
+        self.group.export_subtitle = "Subtítulo antigo"
+        self.group.export_author = "Autor antigo"
+        self.group.cover = original
+        self.assertEqual(self.group.title, self.project.title)
+        self.assertEqual(self.group.subtitle, self.project.subtitle)
+        self.assertEqual(self.group.author, self.project.author)
+        self.assertEqual(self.group.effective_cover.pk, current.pk)
+
     def test_failed_book_duplication_removes_copied_files_and_keeps_source(self):
         asset, content = self.upload()
         before = set(Path(asset.file.storage.location).rglob("*.png"))

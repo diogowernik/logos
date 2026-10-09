@@ -133,8 +133,8 @@ export function ProjectEditor({
   );
 
   return (
-    <EditorWorkspace className={view === "overview" ? "book-workspace" : undefined} bookWorkspace={view === "overview"} editing={view === "text"} spacing={2}>
-      <WorkspacePath>
+    <EditorWorkspace bookWorkspace={view === "overview"} editing={view === "text"} spacing={2}>
+      {view === "book" && <WorkspacePath>
         <WorkspaceBreadcrumbs aria-label="Caminho">
           <Link href="/">Biblioteca</Link>
           {collection && (
@@ -153,7 +153,7 @@ export function ProjectEditor({
           )}
         </WorkspaceBreadcrumbs>
         {view !== "overview" && projectMenu}
-      </WorkspacePath>
+      </WorkspacePath>}
       {error && !properties && !moving && (
         <Alert severity="error">{error}</Alert>
       )}
@@ -241,6 +241,7 @@ export function ProjectEditor({
                 >
                   <SaveIcon />
                 </CompactActionButton>
+                {projectMenu}
               </HeaderActions>
             }
           />

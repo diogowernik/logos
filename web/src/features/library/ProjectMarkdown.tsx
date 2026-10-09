@@ -6,7 +6,11 @@ import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
-import { UploadIcon, RefreshIcon, DownloadIcon, ExtractIcon } from "@/components/icons/NavigationIcons";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import { UploadIcon, RefreshIcon, DownloadIcon, ExtractIcon, DeleteIcon } from "@/components/icons/NavigationIcons";
 import { BookSection } from "./BookSection";
 import { HeaderActions, CompactActionButton } from "@/components/ui/HeaderControls";
 import { BookSourceDrop, BookSourceRow, ProjectFileInfo, ProjectFileName } from "@/theme/project";
@@ -15,6 +19,8 @@ import type { ReadingDocument } from "./ProjectReading";
 import { useMarkdownSources } from "./useMarkdownSources";
 import { ImportFeedback } from "./ImportFeedback";
 import { TextImportDialog } from "./TextImportDialog";
+import { libraryRequest } from "./api";
+import type { SourceFile } from "./source-types";
 const statusLabels = { new: "", imported: "Textos já gerados", changed: "Fonte alterada após a importação", text_missing: "Texto anterior removido · revise o projeto", unregistered: "", registered: "", missing: "" };
 export function ProjectMarkdown({ projectId, groupId, groups, blocked, onBusy, onExtracted, onRead, expanded, onToggle }: {
     expanded?: boolean;
@@ -29,7 +35,19 @@ export function ProjectMarkdown({ projectId, groupId, groups, blocked, onBusy, o
 }) {
     const input = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
+    const [deleting, setDeleting] = useState<SourceFile | null>(null);
     const { target, newName, setNewName, folder, files, checked, disabled, setSelected, preview, reviewOpen, setReviewOpen, stale, upload, loadPreview, generate, reviewNames } = useMarkdownSources({ projectId, groupId, blocked, onBusy, onExtracted, onRead });
+    async function remove() {
+      if (!deleting || disabled) return;
+      const file = deleting;
+      await folder.run("Excluindo Markdown…", async () => {
+        await libraryRequest(`projects/${projectId}/markdown-file?name=${encodeURIComponent(file.name)}&sha256=${file.sha256}`, "DELETE");
+        if (!folder.mounted.current) return;
+        setDeleting(null);
+        setSelected((current) => current.filter((name) => name !== file.name));
+        await folder.refresh();
+      });
+    }
     return <BookSection title="Markdown" expanded={expanded} onToggle={onToggle} actions={<HeaderActions>
       <CompactActionButton label="Atualizar pasta" disabled={disabled} onClick={() => folder.run("Atualizando pasta…", folder.refresh)}><RefreshIcon /></CompactActionButton>
       <CompactActionButton label="Enviar Markdown" disabled={disabled} onClick={() => input.current?.click()}><UploadIcon /></CompactActionButton>
@@ -48,6 +66,7 @@ export function ProjectMarkdown({ projectId, groupId, groups, blocked, onBusy, o
       <HeaderActions>
         <Tooltip title="Baixar Markdown"><IconButton component="a" aria-label={`Baixar ${file.name}`} href={`/api/library/projects/${projectId}/markdown-file?name=${encodeURIComponent(file.name)}`} download={file.name}><DownloadIcon /></IconButton></Tooltip>
         <CompactActionButton label={`Gerar texto de ${file.name}`} disabled={disabled} onClick={() => loadPreview([file.name])}><ExtractIcon /></CompactActionButton>
+        <CompactActionButton label={`Excluir ${file.name}`} disabled={disabled} onClick={() => { folder.setError(null); setDeleting(file); }}><DeleteIcon /></CompactActionButton>
       </HeaderActions>
     </BookSourceRow>)}
     {files.length > 0 && <HeaderActions>
@@ -55,6 +74,18 @@ export function ProjectMarkdown({ projectId, groupId, groups, blocked, onBusy, o
       <Button variant="contained" disabled={disabled} onClick={() => loadPreview(checked.length ? checked : files.map((file) => file.name))}>{checked.length ? "Gerar selecionados" : "Gerar todos"}</Button>
     </HeaderActions>}
     </BookSourceDrop>
+    <Dialog open={Boolean(deleting)} onClose={folder.pending ? undefined : () => setDeleting(null)} fullWidth maxWidth="xs" aria-labelledby="delete-markdown-title">
+      <DialogTitle id="delete-markdown-title">Excluir Markdown?</DialogTitle>
+      <DialogContent>
+        <Typography>{deleting?.name}</Typography>
+        <Typography>Os textos já gerados serão mantidos.</Typography>
+        <ImportFeedback error={folder.error}/>
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={Boolean(folder.pending)} onClick={() => setDeleting(null)}>Cancelar</Button>
+        <Button color="error" disabled={disabled} onClick={() => void remove()}>{folder.pending ? "Excluindo…" : "Excluir"}</Button>
+      </DialogActions>
+    </Dialog>
     <TextImportDialog destination={{groups, target, name: newName, disabled: Boolean(folder.pending), onName: setNewName, onTarget: (next) => { void loadPreview(reviewNames, false, next); }}} open={reviewOpen} preview={preview} source="markdown" pending={folder.pending} stale={stale} error={folder.error} onClose={() => setReviewOpen(false)} onReload={() => loadPreview(reviewNames)} onExtract={generate}/>
   </BookSection>;
 }

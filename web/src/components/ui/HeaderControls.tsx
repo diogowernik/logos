@@ -20,17 +20,19 @@ export const HeaderActions = styled(Box)(({ theme }) => ({
 }));
 export function CompactActionButton({
   label,
+  tooltip,
   children,
   disabled = false,
   onClick,
 }: {
   label: string;
+  tooltip?: string;
   children: ReactNode;
   disabled?: boolean;
   onClick?: () => void;
 }) {
   return (
-    <Tooltip title={label}>
+    <Tooltip title={tooltip ?? label}>
       <span>
         <IconButton aria-label={label} disabled={disabled} onClick={onClick}>
           {children}

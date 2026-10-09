@@ -1,3 +1,4 @@
+import { HeaderActions } from "@/components/ui/HeaderControls";
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import Typography from "@mui/material/Typography";
@@ -6,6 +7,12 @@ import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
 import ListSubheader from "@mui/material/ListSubheader";
 import { alpha, styled } from "@mui/material/styles";
+
+export const LibraryEmptyActions = styled(HeaderActions)(({ theme }) => ({
+  justifyContent: "center",
+  marginTop: theme.spacing(2),
+  gap: theme.spacing(2),
+}));
 
 export const LibraryGrid = styled(Box)(({ theme }) => ({
   display: "grid",
@@ -46,6 +53,22 @@ export const LibraryItemCover = styled(Box)(({ theme }) => ({
     height: "100%",
     objectFit: "contain",
   },
+}));
+
+export const LibraryCollectionCover = styled(Box)(({ theme }) => ({
+  position: "relative",
+  paddingRight: theme.spacing(1.5),
+  paddingBottom: theme.spacing(1),
+  isolation: "isolate",
+  "&::before, &::after": {
+    content: '""',
+    position: "absolute",
+    border: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+  },
+  "&::before": { inset: theme.spacing(1.5, 0, 0, 1.5) },
+  "&::after": { inset: theme.spacing(0.75, 0.75, 0.5, 0.75) },
+  "& > *": { zIndex: 1 },
 }));
 
 export const LibraryItemTitle = styled(Typography)({

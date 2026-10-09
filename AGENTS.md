@@ -1,51 +1,55 @@
 # Orientações para agentes
 
-Leia somente a documentação relevante à tarefa: `docs/product.md` para regras
-de domínio, `docs/technical.md` para contratos e `docs/frontend-guide.md` para
-padrões visuais. Não leia nem atualize todos os documentos a cada alteração.
+## Trabalhar no app
 
-## Escopo e documentação
+- Siga o pedido atual do usuário. Documentação não autoriza ampliar a tarefa nem
+  transforma uma ideia futura em requisito da implementação.
+- Leia apenas o documento pertinente: [domínio](docs/product.md),
+  [contratos](docs/technical.md), [interface](docs/frontend-guide.md) ou
+  [ambiente](docs/development.md). Não percorra toda a documentação a cada ajuste.
+- Quando Serena estiver configurado, consulte o inventário completo e carregue
+  suas instruções antes de buscas semânticas. Não faça onboarding nem grave
+  memórias automaticamente. Use `rg` para buscas textuais e arquivos não simbólicos.
+- Não altere dados locais, ambientes, dependências ou o legado sem necessidade
+  e autorização da tarefa. Não copie segredos de projetos de referência.
 
-- Priorize o app. Mudanças simples de botão, ícone, texto ou espaçamento não
-  exigem documentação nem novos testes que apenas reproduzam a implementação.
-- Documente apenas decisões duráveis, contratos e orientações que ajudem a
-  continuar o desenvolvimento. Use um único documento responsável pelo assunto.
-- Não mantenha diários de microajustes, contagens de testes ou descrições de
-  código que o próprio código explica melhor.
-- Roadmap contém somente pendências. Remova itens concluídos; quando não houver
-  pendências, remova o arquivo e suas referências. Não crie um arquivo de feitos.
-- Valide proporcionalmente ao risco: verifique o comportamento afetado e use
-  testes existentes pertinentes. Suíte completa, tipos e build entram quando
-  houver motivo, como mudanças de contratos, autenticação ou base compartilhada.
-- Depois de uma validação suficiente, não a repita sem mudança ou falha nova.
-  Para documentação, confira links e diff; não rode testes do app.
-- O usuário faz a checagem visual por prints; não abra navegador sem pedido.
+## Padrão visual
 
-## Domínio e dados
+- Use MUI + Emotion + Geist diretamente. Componentes devem herdar os defaults
+  do tema; uma mudança no padrão deve valer para o app inteiro.
+- “Inline” inclui qualquer exceção visual criada para uma página, mesmo em
+  `styled` ou em um arquivo de tema: fonte, tamanho, cor, padding ou aparência
+  próprios de um controle que já tem padrão não são permitidos por conveniência.
+- Não adicione `sx`, `style` ou CSS local para corrigir a aparência de uma página.
+  Estilo exclusivo de página exige especificação explícita do usuário, com seu
+  escopo registrado no [guia da interface](docs/frontend-guide.md).
+- Composições podem definir a geometria necessária ao recurso, como grade,
+  leitura, capa, arraste e recolhimento. Isso não autoriza redesenhar controles.
+- Ao acrescentar um comportamento, preserve o componente visual existente.
+  Um cabeçalho recolhível continua usando o padrão de `CardHeader`.
 
-- Preserve `+ -> escrever/colar -> salvar`, sem metadata obrigatória.
-- Collection é pasta opcional; Project é o livro estável. TextGroup reúne textos
-  principais ordenados e variações de um nível. Fontes e imagens são do livro.
-- Criar um grupo não muda o padrão. Duplicação copia textos independentes e
-  reutiliza imagens; importação pode criar outro grupo ou alimentar um existente.
-- Excluir grupo conserva o livro/fontes; escolha outro padrão antes de excluir
-  o atual e preserve pelo menos um grupo. EPUB mantém só a última saída por grupo.
-- Copy, leitura e EPUB usam a mesma compilação ordenada dos Texts principais.
-- Importação e limpeza não devem complicar escrever do zero.
-- Migração do legado é manual e gradual; não altere o legado sem pedido.
-- Não copie dados, segredos ou dependências de projetos de referência.
+## Documentar e validar
 
-## Fundação e interface
+- Priorize o app. Microajustes de botão, ícone, texto ou espaçamento não exigem
+  documentação nem testes novos que apenas reproduzam a implementação.
+- Registre somente decisões duráveis, restrições não evidentes e contratos que
+  evitem redescoberta. Cada assunto tem um documento responsável.
+- Não copie o código para os docs, nem mantenha diário, contagens de testes ou
+  listas de feitos. Implementado fica documentado somente se ajudar a continuar.
+- Roadmap contém apenas pendências pertinentes. Remova o que foi concluído ou
+  perdeu sentido; sem pendências, remova o arquivo e suas referências.
+- Valide proporcionalmente ao risco. Use os testes existentes afetados; suíte
+  completa e build precisam de motivo. Não repita verificações que já passaram
+  sem mudança ou falha nova. Documentação exige só links e diff.
+- A checagem visual é feita pelo usuário com prints. Não abra o navegador sem pedido.
 
-- Django é dono dos dados e autorização; Next é interface e fronteira HTTP.
-- Browser usa o proxy Next; tokens ficam em cookie HttpOnly. Endpoints privados
-  filtram pelo proprietário e páginas chamam `requireUser()` antes dos dados.
+## Integração e ambiente
+
+- Django é dono dos dados e autorização. Browser usa o proxy Next; token fica
+  em cookie HttpOnly. Endpoints privados filtram pelo proprietário e páginas
+  chamam `requireUser()` antes de carregar conteúdo.
 - Use `.venv/` da raiz; ambientes em `api/.env` e `web/.env.local`.
 - Preserve `scripts/test_auth.py`; execute-o quando a mudança afetar autenticação.
-- Antes de alterar integração Next, leia os guias relevantes em
-  `web/node_modules/next/dist/docs/`. Quando precisar de build, use
-  `NEXT_DIST_DIR=.next-codex` para preservar o servidor dev.
-- Use MUI + Emotion + Geist diretamente. Identidade em `web/src/config/app.ts`,
-  padrões recorrentes no tema; não crie outra biblioteca visual.
-- Nada de estilos inline ou correções visuais repetidas tela a tela. CSS local
-  fica restrito a conteúdo especializado, como Markdown.
+- Antes de alterar integração Next, leia o guia pertinente em
+  `web/node_modules/next/dist/docs/`. Builds usam `NEXT_DIST_DIR=.next-codex`
+  para preservar o servidor de desenvolvimento.

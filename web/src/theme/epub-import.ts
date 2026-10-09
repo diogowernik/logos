@@ -3,6 +3,9 @@ import TextField from "@mui/material/TextField";
 import { styled } from "@mui/material/styles";
 
 export const ImportSourceSelect = styled(TextField)({ minWidth: 200, maxWidth: "100%", flex: 1 });
+export const ImportWarningsLayout = styled(Box)({
+  display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "start",
+});
 export const ImportSectionList = styled(Box)(({ theme }) => ({
   maxHeight: "45vh", overflowY: "auto", borderBlock: `1px solid ${theme.palette.divider}`,
 }));

@@ -57,7 +57,10 @@ def safe_body(raw):
 
 def documents(package: Package):
     result = []
-    for path in package.spine:
+    # EPUB navigation is often outside the reading spine, but can still be kept.
+    navigation = [path for path, resource in package.resources.items()
+                  if "nav" in resource.properties and path not in package.spine]
+    for path in [*navigation, *package.spine]:
         resource = package.resources[path]
         if resource.mime_type not in ("application/xhtml+xml", "text/html"):
             raise EpubImportError("O spine contém um formato de texto não suportado.")
@@ -71,6 +74,7 @@ def documents(package: Package):
         image_paths = {resolve_path(path, img.get("src", "")) for img in body.find_all("img")}
         if "nav" in resource.properties or body.find("nav", attrs={"epub:type": "toc"}):
             kind = "navigation"
+            title = "Sumário do leitor" if path not in package.spine else "Sumário original"
         elif (
             path in package.cover_documents
             or (not text and package.cover_path and image_paths == {package.cover_path})

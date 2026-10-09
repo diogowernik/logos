@@ -1,8 +1,10 @@
 import Box from "@mui/material/Box";
+import Card from "@mui/material/Card";
 import ButtonBase from "@mui/material/ButtonBase";
 import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
 import Alert from "@mui/material/Alert";
+import Paper from "@mui/material/Paper";
 
 import { styled } from "@mui/material/styles";
 import { ReadingButton } from "./workspace";
@@ -13,10 +15,6 @@ export const ProjectSummary = styled(Box)(({ theme }) => ({
   display: "flex",
   flexDirection: "column",
   gap: theme.spacing(1),
-}));
-export const ProjectFeedback = styled(Typography)(({ theme }) => ({
-  fontSize: "0.875rem",
-  color: theme.palette.text.secondary,
 }));
 export const ProjectPanelToolbar = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -98,51 +96,36 @@ export const ProjectFileLink = styled(Box)({
 }) as typeof Box;
 
 
-export const BookTitle = styled(Typography)(({ theme }) => ({
-  fontSize: "1.5rem", fontWeight: 600, color: theme.palette.text.primary,
-  overflowWrap: "anywhere", lineHeight: 1.3,
-})) as typeof Typography;
 export const BookIdentity = styled(Box)(({ theme }) => ({
   display: "flex", alignItems: "center", gap: theme.spacing(1.5), marginBottom: theme.spacing(1),
 }));
 export const BookTitleActions = styled(Box)({ marginLeft: "auto", flexShrink: 0 });
-export const BookGroupsBar = styled(Box)(({ theme }) => ({
-  display: "flex", alignItems: "center", gap: theme.spacing(1), flexWrap: "wrap",
-  paddingBlock: theme.spacing(2), borderTop: `1px solid ${theme.palette.divider}`,
-  "& > :last-child": { marginLeft: "auto" },
-}));
 export const BookGroupSelect = styled(Box)({ minWidth: 180, maxWidth: "100%" });
-export const BookGrid = styled(Box, {
-  shouldForwardProp: (prop) => prop !== "sourcesFocused",
-})<{sourcesFocused: boolean}>(({ theme, sourcesFocused }) => ({
-  display: "grid", alignItems: "start", gap: theme.spacing(3, 4),
-  gridTemplateColumns: sourcesFocused ? "minmax(0,1fr)" : "minmax(0,1.35fr) minmax(0,1fr)",
+export const GroupPrincipalMark = styled("span")(({ theme }) => ({
+  display: "inline-flex", alignItems: "center", color: theme.palette.success.main,
+}));
+export const TextsWithSettings = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "settingsOpen",
+})<{ settingsOpen: boolean }>(({ theme, settingsOpen }) => ({
+  display: "grid", alignItems: "start", gap: theme.spacing(2),
+  gridTemplateColumns: settingsOpen ? "minmax(0, 2fr) minmax(320px, 1fr)" : "minmax(0, 1fr)",
   "& > *": { minWidth: 0 },
-  "@container (max-width: 820px)": { gridTemplateColumns: "minmax(0,1fr)" },
+  "@container (max-width: 700px)": { gridTemplateColumns: "minmax(0, 1fr)", "& > aside": { gridRow: 1 } },
 }));
-export const BookSupport = styled(Box, {
-  shouldForwardProp: (prop) => prop !== "focused",
-})<{focused: boolean}>(({ theme, focused }) => ({
-  display: focused ? "grid" : "block", gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-  gap: theme.spacing(3,4), minWidth: 0,
-  "& > *": { minWidth: 0 }, "& > :last-child": { gridColumn: "1 / -1" },
-  "@container (max-width: 820px)": { display: "block" },
-}));
-export const BookSectionRoot = styled(Box)(({ theme }) => ({
-  borderTop: `1px solid ${theme.palette.divider}`, marginBottom: theme.spacing(3), minWidth: 0,
-})) as typeof Box;
-export const BookSectionHeader = styled(Box)(({ theme }) => ({
-  display: "flex", alignItems: "center", gap: theme.spacing(1), minHeight: 56,
-  "& > :last-child:not(:first-child)": { marginLeft: "auto" },
-}));
+export const GroupSettingsPanel = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+})) as typeof Paper;
+export const GroupCreateRow = styled(Box)({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+});
+export const BookSectionRoot = styled(Card)({ minWidth: 0 }) as typeof Card;
 export const BookSectionToggle = styled(ButtonBase)(({ theme }) => ({
   display: "flex", alignItems: "center", gap: theme.spacing(1), textAlign: "left",
-  paddingBlock: theme.spacing(1.5), minWidth: 0,
-  "& .MuiTypography-root": { fontSize: "1rem", fontWeight: 500 },
-  "& svg": { color: theme.palette.text.secondary },
-  "& .navigation-chevron": { width: 16, height: 16, transition: "transform .15s", "&.collapsed": { transform: "rotate(-90deg)" } },
+  minWidth: 0,
+  "& .navigation-chevron": { transition: "transform .15s", "&.collapsed": { transform: "rotate(-90deg)" } },
 }));
-export const BookSectionBody = styled(Box)(({ theme }) => ({paddingBottom: theme.spacing(1)}));
 export const BookExport = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(3), paddingTop: theme.spacing(2),
   borderTop: `1px solid ${theme.palette.divider}`,
@@ -154,15 +137,7 @@ export const BookSourceDrop = styled(Box, {
   outline: dragging ? `2px dashed ${theme.palette.primary.main}` : "none",
   borderRadius: theme.shape.borderRadius,
 }));
-export const BookSourceRow = styled(ProjectFileRow)(({ theme }) => ({
-  flexWrap: "nowrap", gap: theme.spacing(1), paddingBlock: theme.spacing(.5), minHeight: 48,
-  "& .MuiTypography-root": { fontSize: ".9375rem" },
-  "& .MuiTypography-caption": { fontSize: ".75rem" },
-  "& .MuiCheckbox-root": { padding: theme.spacing(.5) },
-  "& .MuiIconButton-root": { padding: theme.spacing(.75) },
-}));
+export const BookSourceRow = styled(ProjectFileRow)({
+  flexWrap: "nowrap",
+});
 export const BookCleanRow = styled(BookSourceRow)(({ theme }) => ({paddingLeft: theme.spacing(2), "& > :first-child": { flex: 1, minWidth: 0 }}));
-export const BookRowActions = styled(Box)(({ theme }) => ({
-  display: "flex", alignItems: "center", gap: theme.spacing(.25), flexShrink: 0,
-  "& .MuiIconButton-root": { padding: theme.spacing(.75), color: theme.palette.text.secondary },
-}));

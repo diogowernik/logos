@@ -3,13 +3,11 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import MenuItem from "@mui/material/MenuItem";
 import { useRef } from "react";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import { ReadingButton } from "@/theme/workspace";
+import Link from "@mui/material/Link";
 import { BookSection } from "./BookSection";
-import { UploadIcon, DownloadIcon, ExtractIcon, CleanIcon, RefreshIcon } from "@/components/icons/NavigationIcons";
+import { UploadIcon, ExtractIcon, CleanIcon, RefreshIcon } from "@/components/icons/NavigationIcons";
 import { HeaderActions, CompactActionButton } from "@/components/ui/HeaderControls";
-import { BookSourceRow, BookCleanRow, ProjectFileInfo } from "@/theme/project";
+import { BookSourceRow, ProjectFileInfo } from "@/theme/project";
 import { LocalEpubs } from "./LocalEpubs";
 import type { EpubImportJob } from "./import-types";
 import { importDiagnostic } from "./import-types";
@@ -55,32 +53,25 @@ export function ProjectEpubs({ projectId, groupId, groups, jobs, onJob, onExtrac
         {job ? <>
           <BookSourceRow>
             <ProjectFileInfo>
-              {onRead ? <ReadingButton disabled={blocked || Boolean(pending)} onClick={() => controller.readSource("original")}>{job.original_name}</ReadingButton> : <Typography>{job.original_name}</Typography>}
-              <Typography variant="caption" color="text.secondary">Original · {job.inspection.sections.length} seções</Typography>
+              <Link href={job.original_url} download={job.original_name}>{job.original_name}</Link>
             </ProjectFileInfo>
             <HeaderActions>
-              <Tooltip title="Baixar original"><IconButton component="a" aria-label="Baixar original" href={job.original_url} download={job.original_name}><DownloadIcon /></IconButton></Tooltip>
-              <CompactActionButton label="Extrair do original" disabled={blocked || Boolean(pending)} onClick={() => controller.loadPreview("original")}><ExtractIcon /></CompactActionButton>
+              <CompactActionButton label="Gerar EPUB limpo" disabled={blocked || Boolean(pending) || job.status === "processing"} onClick={controller.reviewClean}><CleanIcon /></CompactActionButton>
+              <CompactActionButton label="Criar textos a partir do EPUB original" tooltip="Criar textos a partir desse EPUB" disabled={blocked || Boolean(pending)} onClick={() => controller.loadPreview("original")}><ExtractIcon /></CompactActionButton>
             </HeaderActions>
           </BookSourceRow>
-          <ImportWarnings warnings={job.clean_url ? (job.clean_report.warnings ?? []) : job.inspection.warnings}/>
-          <BookCleanRow>
-            <Stack>
-              {job.clean_url && onRead ? <ReadingButton disabled={blocked || Boolean(pending)} onClick={() => controller.readSource("cleaned")}>{job.clean_filename}</ReadingButton> : <Typography variant="body2" color="text.secondary">{job.clean_filename || "Nenhuma cópia limpa gerada."}</Typography>}
-              {job.status === "processing" && <Typography variant="caption" role="status">Limpeza em andamento. Atualize para consultar o resultado.</Typography>}
-            </Stack>
-            <HeaderActions>
-              <CompactActionButton label="Atualizar" disabled={blocked || Boolean(pending)} onClick={controller.refreshJob}><RefreshIcon /></CompactActionButton>
-              <CompactActionButton label={job.clean_url ? "Limpar novamente" : "Limpar EPUB"} disabled={blocked || Boolean(pending) || job.status === "processing"} onClick={controller.reviewClean}><CleanIcon /></CompactActionButton>
-              {job.clean_url && <>
-                <Tooltip title="Baixar limpo"><IconButton component="a" aria-label="Baixar limpo" href={job.clean_url} download={job.clean_filename}><DownloadIcon /></IconButton></Tooltip>
-                <CompactActionButton label="Extrair do limpo" disabled={blocked || Boolean(pending)} onClick={() => controller.loadPreview("cleaned")}><ExtractIcon /></CompactActionButton>
-              </>}
-            </HeaderActions>
-          </BookCleanRow>
-          <EpubCleanDialog job={job} open={cleanOpen} selected={controller.sections} onSelection={controller.setSections} onClose={() => controller.setCleanOpen(false)} onClean={controller.clean} pending={pending} error={controller.error}/>
+          <ImportWarnings importId={job.id} warnings={job.clean_url ? (job.clean_report.warnings ?? []) : job.inspection.warnings}/>
+          {job.status === "processing" && <HeaderActions>
+            <Typography role="status" variant="body2">Limpeza em andamento.</Typography>
+            <CompactActionButton label="Atualizar limpeza" disabled={blocked || Boolean(pending)} onClick={controller.refreshJob}><RefreshIcon /></CompactActionButton>
+          </HeaderActions>}
+          {job.clean_url && <BookSourceRow>
+            <ProjectFileInfo><Link href={job.clean_url} download={job.clean_filename}>{job.clean_filename}</Link></ProjectFileInfo>
+            <CompactActionButton label="Criar textos a partir do EPUB limpo" tooltip="Criar textos a partir desse EPUB" disabled={blocked || Boolean(pending)} onClick={() => controller.loadPreview("cleaned")}><ExtractIcon /></CompactActionButton>
+          </BookSourceRow>}
+          <EpubCleanDialog key={job.id} job={job} open={cleanOpen} selected={controller.sections} onSelection={controller.setSections} onClose={() => controller.setCleanOpen(false)} onClean={controller.clean} pending={pending} error={controller.error}/>
           <TextImportDialog destination={{groups, target: controller.target, name: controller.newName, disabled: Boolean(pending), onName: controller.setNewName, onTarget: (next) => { void controller.loadPreview(controller.source, next); }}} open={previewOpen} preview={controller.preview} source={controller.source} stale={controller.stale} pending={pending} error={controller.error} onClose={() => controller.setPreviewOpen(false)} onReload={() => controller.loadPreview(controller.source)} onExtract={controller.extract}/>
-        </> : <Typography variant="body2" color="text.secondary">Nenhum EPUB importado.</Typography>}
+        </> : null}
       </Stack>
       <LocalEpubs projectId={projectId} onJob={onJob} onBusy={onLocalBusy ?? onBusy} compact blocked={blocked || Boolean(pending)} onSelect={controller.select}/>
     </BookSection>);

@@ -72,6 +72,14 @@ export function PlusIcon() {
   );
 }
 
+export function SettingsIcon() {
+  return <Icon><path d="m9 3-.5 3-2 1.2L3.8 6l-2 3.5L4 11v2l-2.2 1.5 2 3.5 2.7-1.2 2 1.2.5 3h6l.5-3 2-1.2 2.7 1.2 2-3.5L20 13v-2l2.2-1.5-2-3.5-2.7 1.2-2-1.2L15 3Z"/><circle cx="12" cy="12" r="3"/></Icon>;
+}
+
+export function CheckCircleIcon() {
+  return <Icon><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="m7 12 3 3 7-7" stroke="white"/></Icon>;
+}
+
 export function SearchIcon() {
   return (
     <Icon>
@@ -112,6 +120,10 @@ export function CopyIcon() {
       <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
     </Icon>
   );
+}
+
+export function DuplicateIcon() {
+  return <Icon><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3M14 11v6M11 14h6"/></Icon>;
 }
 
 export function SaveIcon() {
@@ -164,7 +176,7 @@ export function ExtractIcon() {
   return <Icon><path d="M3 3h12v18H3zM7 7h4M7 11h3M13 12h9m-4-4 4 4-4 4" /></Icon>;
 }
 export function CleanIcon() {
-  return <Icon><path d="m17 3-8 10M8 10l8 6-5 6-9-7zM20 3v6M17 6h6" /></Icon>;
+  return <Icon><path d="M13 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M7 12h5M7 16h8M18 2l1.2 3.8L23 7l-3.8 1.2L18 12l-1.2-3.8L13 7l3.8-1.2Z" /></Icon>;
 }
 export function RefreshIcon() {
   return <Icon><path d="M20 7a8 8 0 1 0 1 8M20 3v5h-5" /></Icon>;

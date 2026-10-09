@@ -8,11 +8,11 @@ import { useLibrary } from "./LibraryShell";
 import type { Collection, Project, TextSummary } from "./types";
 import { LibraryItem } from "./LibraryItem";
 import { LibrarySearch } from "./LibrarySearch";
-import { LibraryGrid } from "@/theme/library";
+import { BookSection } from "./BookSection";
+import { LibraryGrid, LibraryEmptyActions } from "@/theme/library";
+import { EditorWorkspace } from "@/theme/workspace";
+import { useShell } from "@/components/shell/AppShell";
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
-import CardHeader from "@mui/material/CardHeader";
-import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
@@ -22,7 +22,6 @@ import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
-import Breadcrumbs from "@mui/material/Breadcrumbs";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
@@ -33,6 +32,7 @@ import {
 import {
   SearchIcon,
   ComposeIcon,
+  PlusIcon,
   FilterIcon,
 } from "@/components/icons/NavigationIcons";
 import { DataSection } from "@/components/ui/DataSection";
@@ -47,8 +47,15 @@ export function Library({
   createKind?: "project" | "collection" | null;
 }) {
   const router = useRouter();
+  const { setRightContext } = useShell();
+  useEffect(() => {
+    setRightContext({ key: "library", defaultOpen: false });
+    return () => setRightContext(null);
+  }, [setRightContext]);
   const { projects, collections, loading, refresh } = useLibrary();
   const [searchOpen, setSearchOpen] = useState(autofocus);
+  const [booksExpanded, setBooksExpanded] = useState(true);
+  const [collectionsExpanded, setCollectionsExpanded] = useState(true);
   const [texts, setTexts] = useState<TextSummary[]>([]);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState<"project" | "collection" | null>(
@@ -128,19 +135,12 @@ export function Library({
     }
   }
   return (
-    <Stack component="section" spacing={2}>
-      {selectedCollection && (
-        <Breadcrumbs aria-label="Caminho">
-          <Link href="/">Biblioteca</Link>
-          <Typography>{selectedCollection.title}</Typography>
-        </Breadcrumbs>
-      )}
-      <Card>
-        <CardHeader
+    <EditorWorkspace component="section" editing={false} bookWorkspace spacing={2}>
+      <BookSection
           title={selectedCollection?.title ?? "Biblioteca"}
-          slotProps={{ title: { component: "h1", variant: "h6" } }}
-          subheader={selectedCollection?.description}
-          action={
+          expanded={booksExpanded}
+          onToggle={() => setBooksExpanded(!booksExpanded)}
+          actions={
             <HeaderActions>
               <CompactActionButton
                 label="Buscar na biblioteca"
@@ -159,29 +159,22 @@ export function Library({
               </CompactActionButton>
             </HeaderActions>
           }
-        />
-        <CardContent>
+        >
           {error && !creating && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
           )}
           <Stack spacing={2}>
+            {selectedCollection?.description && <Typography color="text.secondary">{selectedCollection.description}</Typography>}
             {loading ? (
               <Typography color="text.secondary">
                 Carregando biblioteca…
               </Typography>
             ) : (
               <>
-                {(visible.length > 0 || visibleCollections.length > 0) && (
+                {visible.length > 0 && (
                   <LibraryGrid>
-                    {visibleCollections.map((collection) => (
-                      <LibraryItem
-                        key={`collection-${collection.id}`}
-                        href={`/?collection=${collection.id}`}
-                        title={collection.title}
-                      />
-                    ))}
                     {visible.map((project) => (
                       <LibraryItem
                         key={`project-${project.id}`}
@@ -226,26 +219,28 @@ export function Library({
                         Seu próximo texto começa aqui
                       </Typography>
                       <>
-                        <Typography color="text.secondary" sx={{ my: 2 }}>
-                          Comece um texto ou crie um projeto para reunir seus
-                          capítulos.
-                        </Typography>
-                        <HeaderActions>
-                          <Button component={Link} href="/texts/new">
-                            ✎ Novo texto
+                        <LibraryEmptyActions>
+                          <Button component={Link} href="/texts/new" startIcon={<ComposeIcon />}>
+                            Novo texto
                           </Button>
-                          <Button onClick={() => setCreating("project")}>
-                            + Criar projeto
+                          <Button startIcon={<PlusIcon />} onClick={() => setCreating("project")}>
+                            Criar projeto
                           </Button>
-                        </HeaderActions>
+                        </LibraryEmptyActions>
                       </>
                     </Box>
                   )}
               </>
             )}
           </Stack>
-        </CardContent>
-      </Card>
+      </BookSection>
+      {collectionId === null && <BookSection title="Coleções" expanded={collectionsExpanded} onToggle={() => setCollectionsExpanded(!collectionsExpanded)} actions={
+        <HeaderActions><CompactActionButton label="Criar coleção" onClick={() => setCreating("collection")}><PlusIcon /></CompactActionButton></HeaderActions>
+      }>
+        <LibraryGrid>
+          {visibleCollections.map((collection) => <LibraryItem key={collection.id} href={`/?collection=${collection.id}`} title={collection.title} collection coverUrl={projects.find((project) => project.collection === collection.id)?.cover_url}/>) }
+        </LibraryGrid>
+      </BookSection>}
       <LibrarySearch
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
@@ -285,6 +280,6 @@ export function Library({
           </DialogActions>
         </Box>
       </Dialog>
-    </Stack>
+    </EditorWorkspace>
   );
 }

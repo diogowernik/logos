@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from .epub_import.archive import read_package
 from .epub_import.extraction import raster_image
+from .epub_import.conversion import section_reading
 from .import_errors import import_operation
 from .import_serializers import (
     CleanImportSerializer,
@@ -29,6 +30,17 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
         return ImportJob.objects.filter(project__owner=self.request.user).prefetch_related(
             "extractions"
         )
+
+    @action(detail=True, methods=["get"])
+    def section(self, request, pk=None):
+        job = self.get_object()
+        with import_operation("preview", "original", job):
+            package = read_package(source_content(job, "original"))
+            data = section_reading(package, request.query_params.get("href"),
+                f"/api/library/epub-imports/{job.pk}/resource?source=original&source_sha256={job.sha256}&href=")
+            if data is None:
+                raise Http404("Seção não encontrada.")
+        return Response(data)
 
     @action(detail=True, methods=["post"])
     def clean(self, request, pk=None):

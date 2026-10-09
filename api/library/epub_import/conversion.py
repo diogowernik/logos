@@ -1,8 +1,33 @@
 """Legacy HTML-to-Markdown conversion, separated and extended for tables and nested blocks."""
 
 import re
+from urllib.parse import quote, urlsplit
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+
+
+def section_reading(package, href, resource_prefix):
+    from .archive import resolve_path
+    from .inspection import documents
+
+    doc = next((d for d in documents(package) if d.href == href), None)
+    if doc is None:
+        return None
+    soup = BeautifulSoup(doc.html, "html.parser")
+    # Reading must not expose the anchors used by the Markdown import pipeline.
+    for element in soup.find_all(id=True):
+        del element["id"]
+    if doc.kind == "navigation":
+        for ordered_list in soup.find_all("ol"):
+            ordered_list.name = "ul"
+    for image in soup.find_all("img", src=True):
+        path = resolve_path(doc.href, image["src"])
+        if path in package.resources:
+            image["src"] = resource_prefix + quote(path, safe="")
+    for link in soup.find_all("a", href=True):
+        if not urlsplit(link["href"]).scheme:
+            link.unwrap()
+    return {"title": doc.title, "markdown": html_to_markdown(str(soup))}
 
 
 def html_to_markdown(content):

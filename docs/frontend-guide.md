@@ -1,62 +1,77 @@
-# Guia da interface
+# Interface: um padrão para o app
 
-MUI + Emotion + Geist são a base. Use componentes MUI diretamente;
-composições próprias agrupam responsabilidades reais, sem recriar um framework.
+MUI + Emotion + Geist são a base. Use os componentes diretamente e herde o tema.
 Logos mantém identidade azul, superfícies neutras e erros em laranja.
+
+As decisões comuns da família estão no
+[guia do App Creator](../../app-creator/docs/frontend-guide.md). A composição
+do livro ainda precisa de uma revisão de espaçamento: o usuário considerou os
+intervalos entre cards grandes. Compactar na composição responsável, evitando
+somar margem e gap; preservar o CardHeader padrão e o recolhimento aprovado.
+
+## Herança visual
+
+Fontes, tamanhos, cores, espaçamentos internos e aparência de controles são
+padrões do app. Ajustar o padrão deve melhorar todas as telas que o usam.
+Não sobrescreva esses valores para resolver uma página isoladamente.
+
+“Inline”, neste projeto, significa também uma regra visual fora do padrão,
+mesmo que esteja em `styled` ou em um arquivo de tema. Transferir um ajuste local
+para `theme/project.ts` não o transforma em padrão compartilhado.
+
+- Cards usam `Card`, `CardHeader` e `CardContent` com seus defaults do tema.
+- Recolhimento acrescenta comportamento ao cabeçalho, sem trocar sua tipografia
+  ou espaçamento. O mesmo vale para outros comportamentos novos.
+- Botões e ícones usam os componentes e ícones existentes. Não substitua ícones
+  por caracteres nem defina tamanhos próprios por página.
+- Textos usam variantes do tema conforme sua função, sem novos valores de fonte.
+- Não adicione `sx`, `style` ou CSS local para alterar a aparência das páginas.
+- Não crie outra biblioteca visual por cima do MUI.
+
+Estilo exclusivo de uma página só cabe quando explicitamente especificado pelo
+usuário. Registre aqui o motivo, a página e o limite da exceção; ela não deve
+se espalhar para outros componentes. Não presuma uma exceção porque facilita
+implementar o recurso.
+
+Geometria funcional pode ser definida pela composição: distribuição em colunas,
+largura de leitura, proporção da capa, área de arraste e animação de recolhimento.
+A renderização de Markdown e de diagnósticos tem necessidades próprias de
+conteúdo. Essas regras não autorizam redefinir a aparência dos controles ao redor.
 
 ## Onde alterar
 
 | Assunto | Fonte em `web/src/` |
 | --- | --- |
-| Identidade, navegação e cores do app | `config/app.ts` |
+| Identidade e cores do app | `config/app.ts` |
 | Tipografia, paleta e métricas gerais | `theme/index.ts` |
 | Defaults de controles, cards e diálogos | `theme/components.ts` |
-| Shell, editor, leitura e ações | `theme/workspace.ts` |
-| Oficina do livro | `theme/project.ts` |
+| Shell, editor e leitura | `theme/workspace.ts` |
+| Geometria dos recursos do livro | `theme/project.ts` |
 | Capas e busca da biblioteca | `theme/library.ts` |
-| Pastas de fontes e upload | `theme/source-folder.ts` |
-| Revisão e diagnóstico de EPUB | `theme/epub-import.ts` |
-| Providers e integração SSR | `components/AppProviders.tsx`, `app/layout.tsx` |
-| Painéis opcionais | `components/shell/AppShell.tsx` |
+| Upload e revisão de fontes | `theme/source-folder.ts`, `theme/epub-import.ts` |
+| Providers e SSR | `components/AppProviders.tsx`, `app/layout.tsx` |
 
-Não use estilos inline nem repita cores, fontes e aparência de controles nas
-features. Padrões recorrentes vão ao tema; geometria particular fica na composição
-responsável. CSS adicional é restrito a conteúdo especializado, como Markdown.
-Medidas e breakpoints atuais estão no código, sem uma tabela paralela aqui.
+Arquivos por recurso complementam o padrão; não criam versões locais dos
+componentes comuns. Valores e breakpoints ficam no código, sem tabelas duplicadas.
 
-## Princípios
+## Interação e estado
 
-- Navegação, editor e leitura usam Geist Sans; código usa Geist Mono.
-- Escrita e prévia usam superfície branca e largura confortável. A área de
-  edição ocupa a altura disponível e rola internamente para textos longos.
-- Biblioteca apresenta capa e nome pequeno, sem Paper por item ou contagens.
-  Não empilhe caixas apenas para criar hierarquia visual.
-- Cabeçalhos agrupam ações à direita. Ícones discretos têm tooltip, nome
-  acessível e foco visível; títulos mantêm semântica de heading adequada.
-- O documento renderizado não precisa de rótulos como “Preview ao vivo”.
-- Diálogos mantêm a ação final em `DialogActions`, fora da área rolável.
-  Pending bloqueia envios duplicados. Explicações devem ajudar uma decisão.
+- Cabeçalhos agrupam ações à direita. Ícones têm nome acessível, tooltip e foco
+  visível. Explicações devem ajudar uma decisão, não descrever o óbvio.
+- Ações finais de diálogos ficam em `DialogActions`, fora do conteúdo rolável.
+  Operações pendentes bloqueiam envios duplicados e mudanças de destino inseguras.
+- Recolher uma área ou lateral não desmonta uma operação pendente nem perde
+  rascunhos. Respostas antigas não substituem o estado de outro livro/grupo.
+- Falha ao atualizar a tela após importar não pode ser apresentada como falha
+  de uma importação já concluída.
 
-## Composição e estado
+`AppShell` reserva uma lateral com `right={null}`; omitir `right` remove o
+controle. `useShell()` coordena contextos, abertura e `rightHost`. Leituras usam
+portal e são limpas ao sair. Biblioteca e painel do livro começam com a direita
+fechada; o editor conserva sua preferência de prévia. No mobile, o Drawer cuida
+de foco, Escape e backdrop; navegação cancelada não fecha a lateral.
 
-`AppShell` recebe header, left, children e right. Omitir um painel remove seu
-controle; `right={null}` reserva um painel vazio. `useShell()` coordena abertura,
-contextos e `rightHost`; features publicam leitura via portal e limpam ao sair.
-O centro mantém sua posição na árvore React ao alternar painel ou viewport,
-preservando rascunhos. Drawer temporário cuida de foco, Escape e backdrop;
-no mobile abre um painel por vez. Navegação cancelada não fecha a lateral.
-
-`ProjectOverview` reúne textos e geração do grupo ao lado das fontes do livro,
-com áreas recolhíveis que permanecem montadas durante operações pendentes.
-A disposição é guardada por livro no navegador; a geometria fica no tema. O contexto do livro começa com
-a direita fechada e restaura a preferência geral ao sair. `ProjectReading`
-concentra a leitura de Text, Markdown ou EPUB de origem em um único documento ativo.
-
-`useProjectEditor` cuida de dados, salvamento e guard de rascunho;
-`useEpubImport`, `useMarkdownSources` e `useSourceFolder` coordenam suas consultas.
-Respostas antigas ou posteriores à desmontagem não devem substituir o estado.
-Após importar, falha no recarregamento não pode parecer falha da importação já
-concluída. Autenticação permanece no servidor e tokens não chegam às features.
-
-Para mudanças no shell, verifique preservação do rascunho, navegação cancelada
-e foco. A validação visual é feita pelo usuário com prints.
+Áreas do livro lembram sua abertura por projeto no navegador. O último documento
+selecionado ocupa a leitura lateral; clicar para ler não implica entrar na edição.
+Para mudanças no shell, preserve rascunho, foco e navegação cancelada. A validação
+visual é feita pelo usuário com prints.

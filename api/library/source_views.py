@@ -11,7 +11,7 @@ from .import_serializers import ImportJobSerializer
 from .services.import_targets import apply_to_target, target_group
 from .services.local_sources import adopt_epub, epub_catalog
 from .services.markdown_sources import import_markdowns, markdown_catalog, preview_markdowns
-from .services.source_files import read_file, upload_markdowns
+from .services.source_files import delete_markdown, read_file, upload_markdowns
 from .source_serializers import (
     LocalEpubSerializer,
     MarkdownImportSerializer,
@@ -55,9 +55,13 @@ class ProjectSourcesMixin:
             )
         return Response(entries, status=201 if request.method == "POST" else 200)
 
-    @action(detail=True, methods=["get"], url_path="markdown-file")
+    @action(detail=True, methods=["get", "delete"], url_path="markdown-file")
     def markdown_file(self, request, pk=None):
         name = request.query_params.get("name", "")
+        if request.method == "DELETE":
+            with import_operation("delete", "markdown"):
+                delete_markdown(self.get_object(), name, request.query_params.get("sha256", ""))
+            return Response(status=204)
         with import_operation("resource", "markdown"):
             content = read_file(self.get_object(), "markdown", name)
         response = HttpResponse(content, content_type="text/plain; charset=utf-8")

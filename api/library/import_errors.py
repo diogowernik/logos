@@ -18,6 +18,7 @@ LABELS = {
     "discover": "Consulta das fontes",
     "adopt": "Vinculação do EPUB",
     "markdown_upload": "Envio dos Markdown",
+    "delete": "Exclusão do arquivo",
     "clean": "Limpeza do EPUB",
     "preview": "Prévia da extração",
     "extract": "Extração dos textos",

@@ -58,19 +58,19 @@ class TextGroup(models.Model):
 
     @property
     def title(self):
-        return self.export_title or self.project.title
+        return self.project.title
 
     @property
     def subtitle(self):
-        return self.export_subtitle or self.project.subtitle
+        return self.project.subtitle
 
     @property
     def author(self):
-        return self.export_author or self.project.author
+        return self.project.author
 
     @property
     def effective_cover(self):
-        return self.cover or self.project.cover
+        return self.project.cover
 
 
 class Text(models.Model):

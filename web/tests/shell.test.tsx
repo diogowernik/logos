@@ -7,6 +7,7 @@ import { AppShell, useShell } from "@/components/shell/AppShell";
 import { render } from "./render";
 let resize: (width: number) => void;
 beforeEach(() => {
+  localStorage.removeItem("logos.shell.panels");
   let width = 1440;
   const subscriptions = new Set<() => void>();
   window.matchMedia = (query) =>
@@ -69,6 +70,29 @@ function Workspace() {
     </AppShell>
   );
 }
+it("restores both panel preferences after remounting the workspace", async () => {
+  const user = userEvent.setup();
+  const first = render(<Workspace />);
+  await user.click(screen.getByRole("button", { name: "Navegação" }));
+  await user.click(screen.getByRole("button", { name: "Preview" }));
+  await waitFor(() => expect(JSON.parse(localStorage.getItem("logos.shell.panels")!)).toEqual({
+    left: false, right: { default: false },
+  }));
+  first.unmount();
+  const second = render(<Workspace />);
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Navegação" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-expanded", "false");
+  });
+  await user.click(screen.getByRole("button", { name: "Navegação" }));
+  await user.click(screen.getByRole("button", { name: "Preview" }));
+  second.unmount();
+  render(<Workspace />);
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Navegação" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-expanded", "true");
+  });
+});
 it("keeps the same editor and draft while panels collapse and the viewport changes", async () => {
   render(<Workspace />);
   const user = userEvent.setup();

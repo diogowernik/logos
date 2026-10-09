@@ -101,6 +101,27 @@ def digest(content):
     return hashlib.sha256(content).hexdigest()
 
 
+def delete_markdown(project, name, expected_sha256):
+    from django.db import transaction
+    from ..models import Project
+
+    filename(name, "markdown")
+    if not isinstance(expected_sha256, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_sha256):
+        raise ValidationError("Informe a identificação do arquivo que será excluído.")
+    try:
+        with transaction.atomic():
+            Project.objects.select_for_update().get(pk=project.pk)
+            with directory(project, "markdown") as fd:
+                content = read_at(fd, name, "markdown")
+                if digest(content) != expected_sha256:
+                    raise ImportConflict("O Markdown mudou. Atualize a pasta antes de excluir.")
+                os.unlink(name, dir_fd=fd)
+    except FileNotFoundError as error:
+        raise ValidationError("Arquivo não encontrado. Atualize a lista da pasta.") from error
+    except OSError as error:
+        raise ValidationError("Não foi possível excluir o arquivo regular desta pasta.") from error
+
+
 def list_files(project, kind):
     entries = []
     try:

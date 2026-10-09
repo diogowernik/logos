@@ -68,6 +68,7 @@ it("creates a project with only its title and opens its overview", async () => {
     </LibraryShell>,
   );
   await screen.findByText("Seu próximo texto começa aqui");
+  expect(screen.getByRole("button", { name: "Mostrar painel de trabalho" })).toHaveAttribute("aria-expanded", "false");
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Criar projeto" }));
   await user.type(screen.getByLabelText("Título"), "Meu projeto");

@@ -30,7 +30,6 @@ export const WorkspaceMain = styled(Box)(({ theme }) => ({
   minWidth: 0,
   overflowY: "auto",
   padding: theme.spacing(2.5, 3),
-  "&:has(.book-workspace)": { backgroundColor: theme.app.surfaces.reading },
   [theme.breakpoints.down("md")]: { padding: theme.spacing(2) },
 })) as typeof Box;
 export const WorkspaceDrawer = styled(Drawer, {

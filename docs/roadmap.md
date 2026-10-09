@@ -1,11 +1,24 @@
-# Pendências de produto
+# Pendências
 
-- Refinar abas e explicações pelo uso real; consolidar Snackbar compartilhado.
-- Coleções em segundo card: capa do primeiro livro, camadas decorativas de pilha,
-  nome pequeno e navegação `Biblioteca / Nome`, sem caixas/contagens por item.
-- Gestor ampliado de arquivos e associação de imagens relativas dos Markdown.
-- Kindle/EPUBCheck, conteúdo especializado e opções de idioma.
-- Trabalho/Leitura, leitura/estudo e progresso; painéis redimensionáveis.
-- Recuperação de jobs interrompidos e processamento assíncrono.
-- Curadoria manual do legado; capa própria de Collection e ordenação por arrastar.
-- Pastas quando o volume justificar; áudio e links de vídeo para MVP3.
+Esta lista orienta próximas decisões, sem impor etapas ou ordem de implementação.
+Concluir ou abandonar um item exige removê-lo; não converter a lista em histórico.
+
+## Recursos ainda sem implementação completa
+
+- Snackbar compartilhado e filtros da Biblioteca.
+- Coleções com capa própria ou do primeiro livro e efeito de pilha; ordenação
+  dos livros e navegação discreta, mantendo capa e nome por item.
+- Gestão de arquivos: upload, copiar endereço e excluir; associação das imagens
+  relativas nos Markdown importados.
+- Recuperação de jobs interrompidos; processamento assíncrono quando necessário.
+- Validação com EPUBCheck e avaliação de compatibilidade Kindle.
+
+## Direções a avaliar pelo uso
+
+- Contexto de Leitura/estudo, progresso, preferências de leitura e laterais
+  redimensionáveis. Os dados continuam compartilhados com Trabalho.
+- Opções de idioma e tratamento de conteúdo especializado.
+- Áudio e links de vídeo no livro, considerados para MVP3.
+
+Ajustes de layout seguem o uso real e o padrão do app; não são um projeto de
+estilos por página.

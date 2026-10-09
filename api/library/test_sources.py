@@ -16,6 +16,37 @@ from .test_imports import fixture
 
 
 class SourceTests(TestCase):
+    def test_delete_markdown_preserves_generated_texts_and_receipt(self):
+        source = self.md / "01.md"
+        source.write_text("# Revisado\nConteúdo preservado")
+        preview = self.preview([source.name])
+        self.assertEqual(self.apply(preview).status_code, 201)
+        entry = self.get("markdown-files").data[0]
+        response = self.client.delete(self.base + "markdown-file/", QUERY_STRING=f"name=01.md&sha256={entry['sha256']}")
+        self.assertEqual(response.status_code, 204, response.data)
+        self.assertFalse(source.exists())
+        self.assertEqual(self.group.texts.get().markdown, "# Revisado\nConteúdo preservado")
+        self.assertEqual(MarkdownImport.objects.filter(group=self.group).count(), 1)
+        self.assertEqual(self.get("markdown-files").data, [])
+
+    def test_delete_markdown_rejects_other_owner_changed_files_and_links(self):
+        source = self.md / "01.md"
+        source.write_text("# Original")
+        entry = self.get("markdown-files").data[0]
+        query = f"name=01.md&sha256={entry['sha256']}"
+        self.client.force_authenticate(self.other)
+        self.assertEqual(self.client.delete(self.base + "markdown-file/", QUERY_STRING=query).status_code, 404)
+        self.client.force_authenticate(self.owner)
+        source.write_text("# Corrigido")
+        self.assertEqual(self.client.delete(self.base + "markdown-file/", QUERY_STRING=query).status_code, 409)
+        self.assertTrue(source.exists())
+        self.assertEqual(self.client.delete(self.base + "markdown-file/", QUERY_STRING=f"name=../01.md&sha256={entry['sha256']}").status_code, 400)
+        link = self.md / "link.md"
+        link.symlink_to(source)
+        self.assertEqual(self.client.delete(self.base + "markdown-file/", QUERY_STRING=f"name=link.md&sha256={entry['sha256']}").status_code, 400)
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(source.read_text(), "# Corrigido")
+
     def test_explicit_source_copy_preserves_archive_and_rejects_conflicting_files(self):
         archive = Path(self.tmp.name) / "archive/old-book"
         (archive / "sources/markdown").mkdir(parents=True)

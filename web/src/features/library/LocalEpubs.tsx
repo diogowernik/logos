@@ -31,6 +31,8 @@ export function LocalEpubs({ projectId, onJob, onBusy, blocked, onSelect, compac
             await folder.refresh();
         });
     }
+    const visibleFiles = folder.files.filter((file) => !compact || file.status !== "registered");
+    if (compact && !visibleFiles.length && !folder.error && !folder.pending) return null;
     return <Stack component="section" spacing={1} aria-label="EPUBs da pasta">
     <ProjectPanelToolbar>
       <Typography component="h3" variant="body2">Fontes da pasta</Typography>
@@ -39,8 +41,8 @@ export function LocalEpubs({ projectId, onJob, onBusy, blocked, onSelect, compac
     <ImportFeedback error={folder.error}/>
     {folder.notice && <Typography role="status" variant="body2">{folder.notice}</Typography>}
     {folder.pending && <Typography role="status" variant="body2">{folder.pending}</Typography>}
-    {folder.loading ? <Typography variant="body2" color="text.secondary">Consultando pasta…</Typography> : !folder.files.length && <Typography variant="body2" color="text.secondary">Nenhum EPUB na pasta.</Typography>}
-    {folder.files.filter((file) => !compact || file.status !== "registered").map((file) => <ProjectFileRow key={file.name}>
+    {folder.loading ? <Typography variant="body2" color="text.secondary">Consultando pasta…</Typography> : !compact && !folder.files.length && <Typography variant="body2" color="text.secondary">Nenhum EPUB na pasta.</Typography>}
+    {visibleFiles.map((file) => <ProjectFileRow key={file.name}>
       <ProjectFileInfo><ProjectFileName>{file.display_name ?? file.name}</ProjectFileName><Typography variant="caption" color={file.status === "missing" || file.status === "changed" ? "warning.main" : "text.secondary"}>{labels[file.status]}</Typography></ProjectFileInfo>
       {file.status === "unregistered" && <Button disabled={blocked || Boolean(folder.pending)} onClick={() => link(file)}>Vincular</Button>}
       {file.status === "registered" && file.job && <Button disabled={blocked || Boolean(folder.pending)} onClick={() => onSelect(file.job!)}>Selecionar</Button>}

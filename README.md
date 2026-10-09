@@ -1,14 +1,11 @@
 # Logos
 
 Biblioteca e oficina pessoal para escrever, revisar e organizar Markdown.
-Base Django/DRF + Next.js, com MUI e Geist.
+Django/DRF fornece dados e autorização; Next.js fornece a interface, com MUI,
+Emotion e Geist.
 
-Collections agrupam Projects; cada Project reúne textos ordenados e variações.
-O app oferece edição com prévia, capas privadas, fontes Markdown individuais ou
-em lote, importação/limpeza de EPUB e extração para o projeto atual. Copy,
-leitura e geração de EPUB compartilham a compilação dos textos principais.
+Cada livro pode ter grupos independentes de textos, compartilhando fontes e
+imagens. O fluxo básico é `+ → escrever/colar → salvar`.
 
-O fluxo básico permanece `+ -> escrever/colar -> salvar`.
-
-Veja [como executar](docs/development.md), a [documentação](docs/README.md) e as
-[pendências](docs/roadmap.md). Banco, ambientes e livros locais não entram no Git.
+Veja [como executar](docs/development.md) e o [índice da documentação](docs/README.md).
+Banco, ambientes e arquivos locais dos livros não entram no Git.

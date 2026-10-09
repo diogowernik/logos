@@ -73,7 +73,7 @@ export function useEpubImport({ projectId, groupId, jobs, onJob, onExtracted, on
       if (!mounted.current) return;
       onJob(result);
       setSelectedId(result.id);
-      setNotice("EPUB disponível. O original foi preservado.");
+      setNotice("");
     });
   }
   function reviewClean() {

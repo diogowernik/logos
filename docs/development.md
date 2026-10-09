@@ -31,7 +31,9 @@ Ambientes: `api/.env` e `web/.env.local`; o usuário Django autentica no fronten
 
 ## Validação conforme a mudança
 
-Escolha os comandos pertinentes, sem executar toda a lista a cada microajuste.
+Ajustes simples de aparência ou texto não exigem suíte completa, build ou docs.
+Escolha só a verificação que cobre o risco da mudança; não execute esta lista
+automaticamente nem repita comandos que já passaram sem uma nova razão.
 Para uma seleção de testes Django, acrescente o módulo ou classe ao comando:
 
 ```bash
@@ -44,7 +46,7 @@ No diretório `web`, conforme necessário:
 ```bash
 npm run lint
 NEXT_DIST_DIR=.next-codex npm run typecheck
-npm test
+npm test -- tests/library.test.tsx # exemplo: selecione o arquivo afetado
 NEXT_DIST_DIR=.next-codex npm run build
 ```
 
@@ -91,9 +93,8 @@ com associação explícita; o comando conserva a pasta original e rejeita colis
 
 A pasta de origem deve conter `originals/` e/ou `sources/markdown/`. Na interface,
 atualize as pastas; vincule o EPUB e escolha o grupo ao gerar textos. O comando
-não cria textos nem faz extração automática. Arquivos anteriores à refatoração
-estão em `api/media/archive/before-groups-*/projects/`, evitando associar arquivos
-de um livro antigo a outro que receba seu ID no banco novo.
+não cria textos nem faz extração automática. Se usar fontes arquivadas em `api/media/archive/before-groups-*/projects/`,
+confira sua procedência; IDs do banco recriado podem pertencer a outros livros.
 
 ## Produção
 

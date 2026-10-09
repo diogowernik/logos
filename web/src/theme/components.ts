@@ -21,7 +21,7 @@ export const components: Components<Theme> = {
   },
   MuiIconButton: {
     defaultProps: { size: "small" },
-    styleOverrides: { root: { width: 36, height: 36 } },
+    styleOverrides: { root: { width: 36, height: 36, flexShrink: 0 } },
   },
   MuiTextField: { defaultProps: { size: "small", variant: "outlined" } },
   MuiInputBase: { styleOverrides: { root: { fontSize: "0.9375rem" } } },
@@ -75,6 +75,7 @@ export const components: Components<Theme> = {
   },
   MuiPaper: {
     styleOverrides: {
+      root: ({ theme }) => ({ backgroundColor: theme.app.surfaces.header }),
       outlined: ({ theme }) => ({ borderColor: theme.palette.divider }),
     },
   },

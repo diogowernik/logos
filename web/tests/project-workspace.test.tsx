@@ -91,7 +91,8 @@ it("creates and selects an independent group without switching the book default"
     return defaults(path, method, body);
   });
   render(<LibraryShell><ProjectEditor projectId="1" /></LibraryShell>);
-  await user.click(await screen.findByRole("button", {name: "Novo grupo vazio"}));
+  await user.click(await screen.findByRole("button", {name: "Configurar grupos"}));
+  await user.click(await screen.findByRole("button", {name: "Novo grupo de textos"}));
   const dialog = screen.getByRole("dialog");
   await user.type(within(dialog).getByLabelText(/Nome/), "Revisão humana");
   await user.click(within(dialog).getByRole("button", {name: "Salvar"}));
@@ -100,9 +101,9 @@ it("creates and selects an independent group without switching the book default"
   expect(current.project.default_group).toBe(1);
   expect(mocks.request.mock.calls.some(([path]) => path.endsWith("/default"))).toBe(false);
   await user.click(screen.getByRole("combobox", {name: "Grupo de textos"}));
-  await user.click(screen.getByRole("option", {name: "Textos · padrão"}));
+  await user.click(screen.getByRole("option", {name: "Textos"}));
   await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("projects/1/content?group=1"));
-  expect(await screen.findByRole("combobox", {name: "Grupo de textos"})).toHaveTextContent("Textos · padrão");
+  expect(await screen.findByRole("combobox", {name: "Grupo de textos"})).toHaveTextContent("Textos");
 });
 
 function defaults(path: string, method?: string, body?: { cover?: string }) {
@@ -375,12 +376,13 @@ it("preserves an in-flight generation and its failure while its area is collapse
   await user.click(screen.getByRole("button", { name: "Gerar novamente" }));
   expect(screen.getByRole("button", { name: "Gerando EPUB…" })).toBeDisabled();
   expect(screen.getByRole("combobox", {name: "Grupo de textos"})).toHaveAttribute("aria-disabled", "true");
-  expect(screen.getByRole("button", {name: "Novo grupo vazio"})).toBeDisabled();
-  await user.click(screen.getByRole("button", { name: "Textos" }));
+  await user.click(screen.getByRole("button", {name: "Configurar grupos"}));
+  expect(screen.getByRole("button", {name: "Novo grupo de textos"})).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Textos", expanded: true }));
   await act(async () => {
     rejectGeneration(new Error("Falha ao gerar"));
   });
-  await user.click(screen.getByRole("button", {name: "Textos"}));
+  await user.click(screen.getByRole("button", {name: "Textos", expanded: false}));
   expect(screen.getByRole("alert")).toHaveTextContent("Falha ao gerar");
   expect(screen.getByRole("link", { name: "Baixar EPUB" })).toHaveAttribute(
     "href",
@@ -464,7 +466,7 @@ it("refreshes the central chapter list and files after extracting into the curre
   render(<LibraryShell><ProjectEditor key="1" projectId="1" /></LibraryShell>);
   const user = userEvent.setup();
   await screen.findByRole("button", {name: "EPUBs de origem"});
-  await user.click(screen.getByRole("button", { name: "Extrair do original" }));
+  await user.click(screen.getByRole("button", { name: "Criar textos a partir do EPUB original" }));
   const dialog = await screen.findByRole("dialog", { name: "Extrair textos do original" });
   await user.click(await within(dialog).findByRole("radio", { name: "Acrescentar ao final, mantendo os textos existentes" }));
   await user.click(within(dialog).getByRole("button", { name: "Extrair textos" }));

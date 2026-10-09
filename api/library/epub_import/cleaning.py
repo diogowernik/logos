@@ -14,8 +14,9 @@ from ..epub.validation import validate_archive
 from . import EpubImportError
 from .archive import parse_xml, read_package, resolve_path
 from .inspection import documents, report
+from .navigation import rebuild_toc
 
-CLEANER_VERSION = "logos-clean-1"
+CLEANER_VERSION = "logos-clean-3"
 
 
 def clean_package(content, selected=None):
@@ -34,12 +35,15 @@ def clean_package(content, selected=None):
     book.set_title(package.title)
     book.set_language(package.language)
     style = epub.EpubItem(
-        uid="style", file_name="Styles/clean.css", media_type="text/css", content=STYLE.encode()
+        uid="style", file_name="Styles/clean.css", media_type="text/css",
+        content=(STYLE + "\nnav ol { list-style: none; }\n").encode()
     )
     book.add_item(style)
     paths = {d.href: f"Text/section_{i:04d}.xhtml" for i, d in enumerate(kept, 1)}
     warnings = list(package.warnings)
     embedded, chapters = set(), []
+    preserved_navigation = None
+    anchors = {d.href: {tag["id"] for tag in BeautifulSoup(d.html, "html.parser").find_all(id=True)} for d in kept}
 
     def image(path):
         resource = package.resources.get(path)
@@ -99,9 +103,18 @@ def clean_package(content, selected=None):
                 continue
             tag[attr] = posixpath.relpath(image(path), "Text")
         for tag in soup.find_all("a", href=True):
+            if tag.parent is None:
+                continue
             parsed = urlsplit(tag["href"])
-            path = resolve_path(doc.href, tag["href"])
+            path = doc.href if not parsed.path and not parsed.scheme and not parsed.netloc else resolve_path(doc.href, tag["href"])
             if path is None:
+                continue
+            if doc.kind == "navigation" and (path not in paths or (parsed.fragment and parsed.fragment not in anchors.get(path, set()))):
+                item = tag.find_parent("li")
+                if item is not None and item.find("ol") is None:
+                    item.decompose()
+                else:
+                    tag.unwrap()
                 continue
             if path in paths:
                 tag["href"] = posixpath.relpath(paths[path], "Text") + (
@@ -115,13 +128,19 @@ def clean_package(content, selected=None):
             uid=f"section-{i}", title=doc.title, file_name=paths[doc.href], lang=package.language
         )
         chapter.content = str(soup).encode()
+        if doc.kind == "navigation" and preserved_navigation is None:
+            chapter.properties = ["nav"]
+            preserved_navigation = chapter
         chapter.add_item(style)
         book.add_item(chapter)
         chapters.append(chapter)
-    book.toc = tuple(chapters)
+    book.toc = rebuild_toc(package, kept, paths)
     book.add_item(epub.EpubNcx())
-    book.add_item(epub.EpubNav())
-    book.spine = ["nav", *chapters]
+    if preserved_navigation is None:
+        book.add_item(epub.EpubNav())
+        book.spine = ["nav", *chapters]
+    else:
+        book.spine = chapters
     output = BytesIO()
     epub.write_epub(output, book)
     result = output.getvalue()

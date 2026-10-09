@@ -268,18 +268,18 @@ export function useProjectEditor({
     finally { if (sequence === loadSequence.current) setPending(false); }
   }
 
-  async function groupAction(action: "create" | "duplicate" | "default" | "delete" | "rename" | "settings", name?: string, settings?: Partial<TextGroup>) {
+  async function groupAction(action: "create" | "duplicate" | "default" | "delete" | "rename", name?: string, targetId?: number) {
     if (!data || !canLeave()) return;
     if (action === "delete" && !window.confirm("Excluir este grupo, seus textos e seu EPUB? Os arquivos do livro serão mantidos.")) return;
     setPending(true); setError("");
     try {
-      let id = data.group.id;
+      let id = targetId ?? data.group.id;
       if (action === "create") {
         id = (await libraryRequest<TextGroup>("groups", "POST", { project: data.project.id, name })).id;
       } else if (action === "duplicate") {
         id = (await libraryRequest<TextGroup>(`groups/${id}/duplicate`, "POST", { name })).id;
-      } else if (action === "rename" || action === "settings") {
-        await libraryRequest(`groups/${id}`, "PATCH", action === "settings" ? settings : { name });
+      } else if (action === "rename") {
+        await libraryRequest(`groups/${id}`, "PATCH", { name });
       } else if (action === "default") {
         await libraryRequest(`groups/${id}/default`, "POST");
       } else {

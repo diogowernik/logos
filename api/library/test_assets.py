@@ -1,6 +1,7 @@
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -9,10 +10,21 @@ from PIL import Image
 from rest_framework.test import APIClient
 
 from .models import Asset, Project
-from .services import create_project, new_version
+from .services import create_group, create_project
+from .services.projects import duplicate_project
 
 
 class ProjectCoverTests(TestCase):
+    def test_failed_book_duplication_removes_copied_files_and_keeps_source(self):
+        asset, content = self.upload()
+        before = set(Path(asset.file.storage.location).rglob("*.png"))
+        with patch("library.services.groups.duplicate_group", side_effect=RuntimeError("failed")):
+            with self.assertRaises(RuntimeError):
+                duplicate_project(self.project, self.user)
+        self.assertEqual(Project.objects.count(), 1)
+        self.assertEqual(set(Path(asset.file.storage.location).rglob("*.png")), before)
+        self.assertEqual(Path(asset.file.path).read_bytes(), content)
+
     def setUp(self):
         directory = TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -24,6 +36,7 @@ class ProjectCoverTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
         self.project = create_project(self.user, "Meu livro")
+        self.group = self.project.default_group
 
     def upload(self, project=None, color="red"):
         content = BytesIO()
@@ -39,9 +52,7 @@ class ProjectCoverTests(TestCase):
 
     def test_upload_and_private_download_preserve_image(self):
         asset, content = self.upload()
-        self.assertEqual(
-            asset.file.name, f"projects/{self.project.family_id}/images/{asset.pk}.png"
-        )
+        self.assertEqual(asset.file.name, f"projects/{self.project.pk}/images/{asset.pk}.png")
         self.assertEqual(Path(asset.file.path).read_bytes(), content)
         endpoint = f"/api/library/assets/{asset.pk}/file/"
         response = self.client.get(endpoint)
@@ -72,7 +83,7 @@ class ProjectCoverTests(TestCase):
         )
         self.project.refresh_from_db()
         self.assertEqual(self.project.cover_id, first.pk)
-        self.assertEqual(self.project.family.assets.count(), 2)
+        self.assertEqual(self.project.assets.count(), 2)
         foreign = create_project(self.other)
         self.assertEqual(
             self.client.patch(
@@ -93,19 +104,19 @@ class ProjectCoverTests(TestCase):
     def test_versions_share_assets_and_copies_survive_original_deletion(self):
         asset, content = self.upload()
         self.project.refresh_from_db()
-        version = new_version(self.project)
-        self.assertEqual(version.cover_id, asset.pk)
+        version = create_group(self.project)
+        self.assertEqual(version.effective_cover.pk, asset.pk)
         self.assertEqual(version.texts.count(), 0)
-        self.assertEqual(version.family.assets.count(), 1)
-        response = self.client.post(f"/api/library/projects/{version.pk}/duplicate/")
+        self.assertEqual(version.project.assets.count(), 1)
+        response = self.client.post(f"/api/library/projects/{self.project.pk}/duplicate/")
         self.assertEqual(response.status_code, 201)
         copied = Project.objects.get(pk=response.data["id"])
-        self.assertNotEqual(copied.family_id, version.family_id)
+        self.assertNotEqual(copied.pk, self.project.pk)
         self.assertNotEqual(copied.cover_id, asset.pk)
         self.assertEqual(Path(copied.cover.file.path).read_bytes(), content)
         with self.captureOnCommitCallbacks(execute=True):
             self.assertEqual(
-                self.client.delete(f"/api/library/projects/{version.pk}/").status_code, 204
+                self.client.delete(f"/api/library/projects/{self.project.pk}/").status_code, 204
             )
         self.assertFalse(Path(asset.file.path).exists())
         self.assertEqual(Path(copied.cover.file.path).read_bytes(), content)

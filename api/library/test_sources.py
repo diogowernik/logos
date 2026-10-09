@@ -1,18 +1,41 @@
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from .models import ImportJob, MarkdownImport, Text
-from .services import create_project, new_version
+from .services import create_group, create_project
 from .test_imports import fixture
 
 
 class SourceTests(TestCase):
+    def test_explicit_source_copy_preserves_archive_and_rejects_conflicting_files(self):
+        archive = Path(self.tmp.name) / "archive/old-book"
+        (archive / "sources/markdown").mkdir(parents=True)
+        (archive / "originals").mkdir()
+        md = archive / "sources/markdown/01.md"
+        md.write_text("# Revisado")
+        original, _ = fixture()
+        (archive / "originals/original.epub").write_bytes(original)
+        call_command(
+            "copy_book_sources", self.project.pk, from_folder=str(archive), stdout=StringIO()
+        )
+        self.assertEqual((self.md / "01.md").read_text(), "# Revisado")
+        self.assertEqual((self.originals / "original.epub").read_bytes(), original)
+        self.assertTrue(md.exists())
+        self.assertFalse(ImportJob.objects.exists())  # Link EPUB explicitly in the app.
+        md.write_text("# Outra fonte")
+        with self.assertRaises(CommandError):
+            call_command("copy_book_sources", self.project.pk, from_folder=str(archive))
+        self.assertEqual((self.md / "01.md").read_text(), "# Revisado")
+
     def setUp(self):
         self.tmp = TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -22,22 +45,23 @@ class SourceTests(TestCase):
         self.owner = get_user_model().objects.create_user(username="source-owner")
         self.other = get_user_model().objects.create_user(username="source-other")
         self.project = create_project(self.owner, "Livro")
+        self.group = self.project.default_group
         self.client = APIClient()
         self.client.force_authenticate(self.owner)
-        self.originals = Path(self.tmp.name) / f"projects/{self.project.family_id}/originals"
-        self.md = Path(self.tmp.name) / f"projects/{self.project.family_id}/sources/markdown"
+        self.originals = Path(self.tmp.name) / f"projects/{self.project.pk}/originals"
+        self.md = Path(self.tmp.name) / f"projects/{self.project.pk}/sources/markdown"
         self.originals.mkdir(parents=True)
         self.md.mkdir(parents=True)
         self.base = f"/api/library/projects/{self.project.pk}/"
 
     def get(self, action, query=None):
-        return self.client.get(self.base + action + "/", query or {})
+        return self.client.get(self.base + action + "/", {"group": self.group.pk, **(query or {})})
 
     def post(self, action, data):
         return self.client.post(self.base + action + "/", data, format="json")
 
     def preview(self, names):
-        result = self.post("markdown-preview", {"files": names})
+        result = self.post("markdown-preview", {"files": names, "group": self.group.pk})
         self.assertEqual(result.status_code, 200, result.data)
         return result.data
 
@@ -47,10 +71,30 @@ class SourceTests(TestCase):
             {
                 "files": [s["href"] for s in preview["sections"]],
                 "source_sha256": preview["source_sha256"],
-                "project_state": preview["project_state"],
+                "group_state": preview["group_state"],
+                "group": self.group.pk,
                 **extra,
             },
         )
+
+    def test_markdown_can_create_an_independent_group_and_retry(self):
+        import uuid
+
+        Text.objects.create(group=self.group, markdown="Final")
+        (self.md / "01.md").write_text("# Revisado")
+        preview = self.post("markdown-preview", {"files": ["01.md"]}).data
+        payload = {k: preview[k] for k in ("source_sha256", "group_state")}
+        payload.update(files=["01.md"], new_group_name="Revisado", operation_id=str(uuid.uuid4()))
+        first = self.post("markdown-import", payload)
+        self.assertEqual(first.status_code, 201, first.data)
+        self.assertEqual(self.post("markdown-import", payload).status_code, 200)
+        self.assertEqual(self.project.groups.count(), 2)
+        self.assertEqual(self.group.texts.get().markdown, "Final")
+        self.assertEqual(
+            self.project.groups.get(pk=first.data["group"]).texts.get().markdown, "# Revisado"
+        )
+        payload["new_group_name"] = "Outra"
+        self.assertEqual(self.post("markdown-import", payload).status_code, 409)
 
     def test_epub_discovery_adoption_reuses_file_and_uploader(self):
         content, _ = fixture()
@@ -186,27 +230,27 @@ class SourceTests(TestCase):
         first = self.apply(preview)
         self.assertEqual(first.status_code, 201, first.data)
         self.assertEqual(
-            list(self.project.texts.values_list("markdown", flat=True)),
+            list(self.group.texts.values_list("markdown", flat=True)),
             ["# Primeiro\n\n**Conteúdo**", "## Parte\n\nSegunda"],
         )
-        text = self.project.texts.first()
+        text = self.group.texts.first()
         text.markdown = "Revisado"
         text.save()
         repeat = self.apply(preview)
         self.assertEqual(repeat.status_code, 200)
         text.refresh_from_db()
         self.assertEqual(text.markdown, "Revisado")
-        self.assertEqual(self.project.texts.count(), 2)
+        self.assertEqual(self.group.texts.count(), 2)
         # Overlapping batch includes the earlier receipt without duplicating its Text.
         partial = self.preview(["01-ato.md"])
         result = self.apply(partial, mode="append", confirm_existing=True)
         self.assertEqual(result.status_code, 201)
-        self.assertEqual(self.project.texts.count(), 2)
+        self.assertEqual(self.group.texts.count(), 2)
         self.assertEqual(self.get("markdown-files").data[0]["status"], "imported")
 
     def test_existing_texts_require_choice_confirmation_and_replace_variations(self):
-        parent = Text.objects.create(project=self.project, title="Original", markdown="keep")
-        Text.objects.create(project=self.project, parent=parent, markdown="variation")
+        parent = Text.objects.create(group=self.group, title="Original", markdown="keep")
+        Text.objects.create(group=self.group, parent=parent, markdown="variation")
         (self.md / "a.md").write_text("# New")
         preview = self.preview(["a.md"])
         self.assertEqual(preview["existing_text_count"], 2)
@@ -214,7 +258,7 @@ class SourceTests(TestCase):
         self.assertEqual(self.apply(preview, mode="replace").status_code, 409)
         applied = self.apply(preview, mode="replace", confirm_existing=True)
         self.assertEqual(applied.status_code, 201)
-        self.assertEqual(self.project.texts.count(), 1)
+        self.assertEqual(self.group.texts.count(), 1)
         self.assertEqual((self.md / "a.md").read_text(), "# New")
 
     def test_file_and_project_changes_invalidate_preview(self):
@@ -224,7 +268,7 @@ class SourceTests(TestCase):
         path.write_text("# Changed")
         self.assertEqual(self.apply(preview).status_code, 409)
         preview = self.preview(["a.md"])
-        Text.objects.create(project=self.project, markdown="new draft")
+        Text.objects.create(group=self.group, markdown="new draft")
         self.assertEqual(self.apply(preview, mode="append", confirm_existing=True).status_code, 409)
         self.assertEqual(MarkdownImport.objects.count(), 0)
 
@@ -232,25 +276,25 @@ class SourceTests(TestCase):
         (self.md / "a.md").write_text("# A")
         preview = self.preview(["a.md"])
         self.apply(preview)
-        self.project.texts.all().delete()
+        self.group.texts.all().delete()
         self.assertEqual(self.get("markdown-files").data[0]["status"], "text_missing")
         self.assertEqual(self.apply(preview).status_code, 409)
-        self.assertEqual(self.project.texts.count(), 0)
+        self.assertEqual(self.group.texts.count(), 0)
 
     def test_versions_share_sources_but_have_independent_receipts(self):
         (self.md / "a.md").write_text("# A")
         preview = self.preview(["a.md"])
         self.apply(preview)
-        version = new_version(self.project)
-        self.base = f"/api/library/projects/{version.pk}/"
+        version = create_group(self.project)
+        self.group = version
         self.assertEqual(self.get("markdown-files").data[0]["status"], "new")
         result = self.apply(self.preview(["a.md"]))
         self.assertEqual(result.status_code, 201)
-        self.assertEqual(self.project.texts.count(), 1)
+        self.assertEqual(self.project.default_group.texts.count(), 1)
         self.assertEqual(version.texts.count(), 1)
 
     def test_database_failure_rolls_back_replacement(self):
-        old = Text.objects.create(project=self.project, markdown="preserve")
+        old = Text.objects.create(group=self.group, markdown="preserve")
         (self.md / "a.md").write_text("# A")
         preview = self.preview(["a.md"])
         with patch(
@@ -286,9 +330,9 @@ class SourceTests(TestCase):
             [s["href"] for s in preview["sections"]], ["1-ato.md", "2-ato.md", "10-ato.md"]
         )
         self.assertEqual(self.apply(preview).status_code, 201)
-        self.assertEqual(self.project.texts.count(), 3)
+        self.assertEqual(self.group.texts.count(), 3)
         self.assertEqual(
-            list(self.project.texts.values_list("title", flat=True)), ["1 ato", "2 ato", "10 ato"]
+            list(self.group.texts.values_list("title", flat=True)), ["1 ato", "2 ato", "10 ato"]
         )
 
     def test_first_markdown_upload_creates_missing_storage_directories(self):

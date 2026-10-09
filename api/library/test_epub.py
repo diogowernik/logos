@@ -1,4 +1,3 @@
-from importlib import import_module
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,10 +5,9 @@ from unittest.mock import patch
 from xml.etree import ElementTree as XML
 from zipfile import ZipFile
 
-from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection, transaction
+from django.db import transaction
 from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
 from rest_framework.test import APIClient
@@ -17,9 +15,9 @@ from rest_framework.test import APIClient
 from .compilation import Manuscript, Section
 from .epub import ImageResource, generate_epub
 from .models import ExportArtifact, Text
-from .services import compile_project, create_project, new_version
+from .services import compile_group, create_group, create_project
 from .services.assets import upload_cover
-from .services.exports import delete_project_epub
+from .services.exports import delete_group_epub
 
 
 def image_bytes(format="PNG"):
@@ -246,30 +244,18 @@ class EpubExportTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
         self.project = create_project(self.user, "Meu livro")
-        self.endpoint = f"/api/library/projects/{self.project.pk}/epub/"
+        self.group = self.project.default_group
+        self.endpoint = f"/api/library/groups/{self.group.pk}/epub/"
 
     def generate(self):
         response = self.client.post(self.endpoint)
         self.assertEqual(response.status_code, 200, response.data)
-        return ExportArtifact.objects.get(project=self.project)
-
-    def test_existing_artifact_is_numbered_without_moving_or_changing_its_file(self):
-        Text.objects.create(project=self.project, markdown="# Livro\n\nCorpo.")
-        artifact = self.generate()
-        ExportArtifact.objects.filter(pk=artifact.pk).update(filename="meu-livro.epub")
-        path = Path(artifact.file.path)
-        original = path.read_bytes()
-        migration = import_module("library.migrations.0005_exportartifact_generation")
-        migration.number_existing_downloads(apps, connection.schema_editor())
-        artifact.refresh_from_db()
-        self.assertEqual(artifact.filename, "meu-livro_v1.epub")
-        self.assertEqual(path.read_bytes(), original)
-        self.assertEqual(self.generate().filename, "meu-livro_v2.epub")
+        return ExportArtifact.objects.get(group=self.group)
 
     def test_copy_reader_compilation_and_export_share_reference_scopes_without_editing_texts(self):
         texts = [
             Text.objects.create(
-                project=self.project,
+                group=self.group,
                 position=index,
                 markdown=f"# Parte {index}\n\n[Ref][source] Nota[^a].\n\n"
                 f"[source]: https://example.com/{index}\n\n[^a]: Nota {index}.",
@@ -277,10 +263,8 @@ class EpubExportTests(TestCase):
             for index in (1, 2)
         ]
         original = [text.markdown for text in texts]
-        shared = self.client.get(f"/api/library/projects/{self.project.pk}/markdown/").data[
-            "markdown"
-        ]
-        self.assertEqual(shared, compile_project(self.project).markdown())
+        shared = self.client.get(f"/api/library/groups/{self.group.pk}/markdown/").data["markdown"]
+        self.assertEqual(shared, compile_group(self.group).markdown())
         artifact = self.generate()
         with ZipFile(BytesIO(artifact.file.read())) as archive:
             for index in (1, 2):
@@ -295,16 +279,14 @@ class EpubExportTests(TestCase):
             self.assertEqual(text.markdown, body)
 
     def test_orders_saved_texts_excludes_variations_and_downloads_privately(self):
-        second = Text.objects.create(
-            project=self.project, markdown="# Segundo\n\nDois.", position=1
-        )
-        Text.objects.create(project=self.project, markdown="# Primeiro\n\nUm.", position=0)
-        Text.objects.create(project=self.project, parent=second, markdown="# VARIATION")
+        second = Text.objects.create(group=self.group, markdown="# Segundo\n\nDois.", position=1)
+        Text.objects.create(group=self.group, markdown="# Primeiro\n\nUm.", position=0)
+        Text.objects.create(group=self.group, parent=second, markdown="# VARIATION")
         upload_cover(
             self.project, SimpleUploadedFile("cover.png", image_bytes(), content_type="image/png")
         )
         artifact = self.generate()
-        self.assertTrue(artifact.file.name.startswith(f"projects/{self.project.family_id}/ebooks/"))
+        self.assertTrue(artifact.file.name.startswith(f"projects/{self.project.pk}/ebooks/"))
         with ZipFile(BytesIO(artifact.file.read())) as archive:
             self.assertIn(b"Primeiro", archive.read("EPUB/chapter_001.xhtml"))
             self.assertIn(b"Segundo", archive.read("EPUB/chapter_002.xhtml"))
@@ -315,7 +297,7 @@ class EpubExportTests(TestCase):
         response.close()
         self.assertEqual(downloaded, Path(artifact.file.path).read_bytes())
         self.assertIn("attachment", response["Content-Disposition"])
-        self.assertIn("meu-livro_v1.epub", response["Content-Disposition"])
+        self.assertIn("meu-livro-textos_v1.epub", response["Content-Disposition"])
         self.client.force_authenticate(self.other)
         self.assertEqual(self.client.post(self.endpoint).status_code, 404)
         self.assertEqual(self.client.get(self.endpoint + "file/").status_code, 404)
@@ -323,9 +305,9 @@ class EpubExportTests(TestCase):
         self.assertEqual(self.client.get(self.endpoint + "file/").status_code, 401)
 
     def test_regeneration_replaces_only_after_success_and_versions_start_without_epub(self):
-        Text.objects.create(project=self.project, markdown="# Livro\n\nOriginal.")
+        Text.objects.create(group=self.group, markdown="# Livro\n\nOriginal.")
         artifact = self.generate()
-        self.assertEqual(artifact.filename, "meu-livro_v1.epub")
+        self.assertEqual(artifact.filename, "meu-livro-textos_v1.epub")
         old_path = Path(artifact.file.path)
         old_bytes = old_path.read_bytes()
         with patch("library.services.exports.generate_epub", side_effect=RuntimeError("failed")):
@@ -340,20 +322,20 @@ class EpubExportTests(TestCase):
             with self.assertRaises(RuntimeError):
                 self.client.post(self.endpoint)
         self.assertEqual(list(old_path.parent.glob("*.epub")), [old_path])
-        Text.objects.filter(project=self.project).update(markdown="# Livro\n\nEditado.")
+        Text.objects.filter(group=self.group).update(markdown="# Livro\n\nEditado.")
         with self.captureOnCommitCallbacks(execute=True):
             replacement = self.generate()
         self.assertEqual(replacement.generation, 2)
-        self.assertEqual(replacement.filename, "meu-livro_v2.epub")
+        self.assertEqual(replacement.filename, "meu-livro-textos_v2.epub")
         self.assertFalse(old_path.exists())
         self.assertNotEqual(Path(replacement.file.path).read_bytes(), old_bytes)
-        self.assertFalse(ExportArtifact.objects.filter(project=new_version(self.project)).exists())
+        self.assertFalse(ExportArtifact.objects.filter(group=create_group(self.project)).exists())
         with self.captureOnCommitCallbacks(execute=True):
             self.project.delete()
         self.assertFalse(Path(replacement.file.path).exists())
 
     def test_delete_is_private_preserves_source_and_restarts_generation_number(self):
-        text = Text.objects.create(project=self.project, markdown="# Livro\n\nCorpo.")
+        text = Text.objects.create(group=self.group, markdown="# Livro\n\nCorpo.")
         upload_cover(
             self.project, SimpleUploadedFile("cover.png", image_bytes(), content_type="image/png")
         )
@@ -371,25 +353,44 @@ class EpubExportTests(TestCase):
         self.assertFalse(epub_path.exists())
         self.assertTrue(cover_path.exists())
         self.assertTrue(Text.objects.filter(pk=text.pk).exists())
-        self.assertFalse(ExportArtifact.objects.filter(project=self.project).exists())
+        self.assertFalse(ExportArtifact.objects.filter(group=self.group).exists())
         self.assertIsNone(
             self.client.get(f"/api/library/projects/{self.project.pk}/content/").data["epub"]
         )
         self.assertEqual(self.client.get(self.endpoint + "file/").status_code, 404)
         self.assertEqual(self.client.delete(self.endpoint).status_code, 204)
-        self.assertEqual(self.generate().filename, "meu-livro_v1.epub")
+        self.assertEqual(self.generate().filename, "meu-livro-textos_v1.epub")
 
     def test_delete_does_not_remove_file_if_transaction_rolls_back(self):
-        Text.objects.create(project=self.project, markdown="# Livro\n\nCorpo.")
+        Text.objects.create(group=self.group, markdown="# Livro\n\nCorpo.")
         artifact = self.generate()
         path = Path(artifact.file.path)
         with self.captureOnCommitCallbacks(execute=True):
             with self.assertRaises(RuntimeError):
                 with transaction.atomic():
-                    delete_project_epub(self.project)
+                    delete_group_epub(self.group)
                     raise RuntimeError("rollback")
         self.assertTrue(path.exists())
-        self.assertTrue(ExportArtifact.objects.filter(project=self.project).exists())
+        self.assertTrue(ExportArtifact.objects.filter(group=self.group).exists())
+
+    def test_export_rejects_changed_snapshot_and_marks_previous_output_stale(self):
+        from .epub.engine import generate_epub
+
+        text = Text.objects.create(group=self.group, markdown="# Livro\n\nCorpo.")
+        artifact = self.generate()
+        original = Path(artifact.file.path).read_bytes()
+
+        def concurrent_change(*args, **kwargs):
+            Text.objects.filter(pk=text.pk).update(markdown="# Livro\n\nMudou.")
+            return generate_epub(*args, **kwargs)
+
+        with patch("library.services.exports.generate_epub", side_effect=concurrent_change):
+            self.assertEqual(self.client.post(self.endpoint).status_code, 400)
+        artifact.refresh_from_db()
+        self.assertEqual(artifact.generation, 1)
+        self.assertEqual(Path(artifact.file.path).read_bytes(), original)
+        data = self.client.get(f"/api/library/projects/{self.project.pk}/content/").data
+        self.assertFalse(data["epub"]["is_current"])
 
     def test_empty_project_returns_validation_error_without_creating_file(self):
         response = self.client.post(self.endpoint)

@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from .target_serializers import ImportTargetSerializer
+
 
 class LocalEpubSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
@@ -12,8 +14,5 @@ class MarkdownSelectionSerializer(serializers.Serializer):
     )
 
 
-class MarkdownImportSerializer(MarkdownSelectionSerializer):
+class MarkdownImportSerializer(MarkdownSelectionSerializer, ImportTargetSerializer):
     source_sha256 = serializers.RegexField(r"^[a-f0-9]{64}$")
-    project_state = serializers.RegexField(r"^[a-f0-9]{64}$")
-    mode = serializers.ChoiceField(choices=["append", "replace"], required=False)
-    confirm_existing = serializers.BooleanField(default=False)

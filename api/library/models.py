@@ -15,16 +15,25 @@ class Collection(models.Model):
         ordering = ["position", "id"]
 
 
-class ProjectFamily(models.Model):
+class Project(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     collection = models.ForeignKey(Collection, null=True, blank=True, on_delete=models.SET_NULL)
+    title = models.CharField(max_length=250, default="Sem título")
+    subtitle = models.CharField(max_length=500, blank=True)
+    author = models.CharField(max_length=250, blank=True)
     position = models.PositiveIntegerField(default=0)
     is_inbox = models.BooleanField(default=False)
-    principal = models.OneToOneField(
-        "Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="principal_of"
+    default_group = models.OneToOneField(
+        "TextGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="default_of"
     )
+    cover = models.ForeignKey(
+        "Asset", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        ordering = ["position", "id"]
         constraints = [
             models.UniqueConstraint(
                 fields=["owner"], condition=Q(is_inbox=True), name="one_inbox_per_user"
@@ -32,26 +41,47 @@ class ProjectFamily(models.Model):
         ]
 
 
-class Project(models.Model):
-    family = models.ForeignKey(ProjectFamily, related_name="versions", on_delete=models.CASCADE)
-    title = models.CharField(max_length=250, default="Sem título")
-    subtitle = models.CharField(max_length=500, blank=True)
-    author = models.CharField(max_length=250, blank=True)
+class TextGroup(models.Model):
+    project = models.ForeignKey(Project, related_name="groups", on_delete=models.CASCADE)
+    name = models.CharField(max_length=250, default="Textos")
+    export_title = models.CharField(max_length=250, blank=True)
+    export_subtitle = models.CharField(max_length=500, blank=True)
+    export_author = models.CharField(max_length=250, blank=True)
     cover = models.ForeignKey(
         "Asset", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    @property
+    def title(self):
+        return self.export_title or self.project.title
+
+    @property
+    def subtitle(self):
+        return self.export_subtitle or self.project.subtitle
+
+    @property
+    def author(self):
+        return self.export_author or self.project.author
+
+    @property
+    def effective_cover(self):
+        return self.cover or self.project.cover
+
 
 class Text(models.Model):
-    project = models.ForeignKey(Project, related_name="texts", on_delete=models.CASCADE)
+    group = models.ForeignKey(TextGroup, related_name="texts", on_delete=models.CASCADE)
     parent = models.ForeignKey(
         "self", null=True, blank=True, related_name="variations", on_delete=models.CASCADE
     )
     title = models.CharField(max_length=250, blank=True)
     markdown = models.TextField(blank=True)
     position = models.PositiveIntegerField(default=0)
+    origin = models.JSONField(default=dict, blank=True)
     last_used_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -60,49 +90,55 @@ class Text(models.Model):
 
 def asset_upload_path(instance, filename):
     extension = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[instance.mime_type]
-    return f"projects/{instance.family_id}/images/{instance.id}.{extension}"
+    return f"projects/{instance.project_id}/images/{instance.id}.{extension}"
 
 
 class Asset(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    family = models.ForeignKey(ProjectFamily, related_name="assets", on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, related_name="assets", on_delete=models.CASCADE)
     file = models.FileField(upload_to=asset_upload_path)
     original_name = models.CharField(max_length=255)
     mime_type = models.CharField(max_length=100)
+    sha256 = models.CharField(max_length=64)
+    origins = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["project", "sha256"], name="unique_project_asset")
+        ]
 
 
 def export_upload_path(instance, filename):
-    return f"projects/{instance.project.family_id}/ebooks/{instance.project_id}-{uuid.uuid4()}.epub"
+    return f"projects/{instance.group.project_id}/ebooks/{instance.group_id}-{uuid.uuid4()}.epub"
 
 
 class ExportArtifact(models.Model):
-    project = models.OneToOneField(Project, related_name="epub_artifact", on_delete=models.CASCADE)
+    group = models.OneToOneField(TextGroup, related_name="epub_artifact", on_delete=models.CASCADE)
     file = models.FileField(upload_to=export_upload_path)
     filename = models.CharField(max_length=255)
     generation = models.PositiveIntegerField(default=1)
     sha256 = models.CharField(max_length=64)
+    source_sha256 = models.CharField(max_length=64)
     compiler_version = models.CharField(max_length=40)
     created_at = models.DateTimeField(auto_now=True)
 
 
 def import_original_path(instance, filename):
-    return f"projects/{instance.family_id}/originals/{instance.pk}.epub"
+    return f"projects/{instance.project_id}/originals/{instance.pk}.epub"
 
 
 def import_clean_path(instance, filename):
     return (
-        f"projects/{instance.family_id}/ebooks/imports/"
+        f"projects/{instance.project_id}/ebooks/imports/"
         f"{instance.pk}-v{instance.clean_generation}-{uuid.uuid4()}.epub"
     )
 
 
 class ImportJob(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    family = models.ForeignKey(ProjectFamily, related_name="imports", on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, related_name="imports", on_delete=models.CASCADE)
     original_file = models.FileField(upload_to=import_original_path)
     original_name = models.CharField(max_length=255)
     sha256 = models.CharField(max_length=64)
@@ -121,13 +157,13 @@ class ImportJob(models.Model):
     class Meta:
         ordering = ["-created_at", "id"]
         constraints = [
-            models.UniqueConstraint(fields=["family", "sha256"], name="unique_import_source"),
+            models.UniqueConstraint(fields=["project", "sha256"], name="unique_import_source")
         ]
 
 
 class ImportExtraction(models.Model):
     job = models.ForeignKey(ImportJob, related_name="extractions", on_delete=models.CASCADE)
-    project = models.ForeignKey(Project, related_name="imports_extracted", on_delete=models.CASCADE)
+    group = models.ForeignKey(TextGroup, related_name="imports_extracted", on_delete=models.CASCADE)
     source_sha256 = models.CharField(max_length=64)
     source_kind = models.CharField(max_length=10, default="cleaned")
     mode = models.CharField(max_length=10)
@@ -138,14 +174,14 @@ class ImportExtraction(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["job", "project", "source_kind", "source_sha256"],
-                name="unique_project_extraction",
-            ),
+                fields=["job", "group", "source_kind", "source_sha256"],
+                name="unique_group_extraction",
+            )
         ]
 
 
 class MarkdownImport(models.Model):
-    project = models.ForeignKey(Project, related_name="markdown_imports", on_delete=models.CASCADE)
+    group = models.ForeignKey(TextGroup, related_name="markdown_imports", on_delete=models.CASCADE)
     fingerprint = models.CharField(max_length=64)
     mode = models.CharField(max_length=10)
     files = models.JSONField(default=list)
@@ -153,7 +189,19 @@ class MarkdownImport(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["project", "fingerprint"], name="unique_markdown_import"
-            ),
+            models.UniqueConstraint(fields=["group", "fingerprint"], name="unique_markdown_import")
+        ]
+
+
+class GroupCreation(models.Model):
+    """A request key protects creation retries without making sources single-use."""
+
+    project = models.ForeignKey(Project, related_name="group_creations", on_delete=models.CASCADE)
+    key = models.UUIDField()
+    fingerprint = models.CharField(max_length=64)
+    group = models.ForeignKey(TextGroup, null=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["project", "key"], name="unique_group_creation")
         ]

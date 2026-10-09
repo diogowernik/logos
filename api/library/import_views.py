@@ -1,10 +1,8 @@
 """Private import endpoints; parsing and domain operations stay outside the HTTP layer."""
 
 from django.http import FileResponse, Http404, HttpResponse
-from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .epub_import.archive import read_package
@@ -17,9 +15,10 @@ from .import_serializers import (
     ImportResourceSerializer,
     ImportSourceSerializer,
 )
-from .models import ImportJob, Project
+from .models import ImportJob
 from .services.extraction import extract_texts, preview_extraction
 from .services.import_sources import source_content, source_digest
+from .services.import_targets import apply_to_target, target_group
 from .services.imports import ImportConflict, clean_import
 
 
@@ -27,19 +26,8 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ImportJobSerializer
 
     def get_queryset(self):
-        return ImportJob.objects.filter(family__owner=self.request.user).prefetch_related(
+        return ImportJob.objects.filter(project__owner=self.request.user).prefetch_related(
             "extractions"
-        )
-
-    def target(self, job, pk):
-        if not str(pk or "").isdigit():
-            raise ValidationError("Informe o projeto de destino da extração.")
-        return get_object_or_404(
-            Project,
-            pk=pk,
-            family_id=job.family_id,
-            family__owner=self.request.user,
-            family__is_inbox=False,
         )
 
     @action(detail=True, methods=["post"])
@@ -54,12 +42,12 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["get"])
     def preview(self, request, pk=None):
         job = self.get_object()
-        project = self.target(job, request.query_params.get("project"))
+        group = target_group(job.project, request.query_params.get("group"))
         serializer = ImportSourceSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         source = serializer.validated_data["source"]
         with import_operation("preview", source, job):
-            data = preview_extraction(job, project, source)
+            data = preview_extraction(job, group, source)
         return Response(data)
 
     @action(detail=True, methods=["post"])
@@ -68,20 +56,25 @@ class ImportJobViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = ExtractImportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        project = self.target(job, data["project"])
         with import_operation("extract", data["source"], job):
-            receipt, created = extract_texts(
-                job,
-                project,
-                source_sha256=data["source_sha256"],
-                project_state_token=data["project_state"],
-                mode=data.get("mode"),
-                confirm_existing=data["confirm_existing"],
-                source=data["source"],
+            receipt, created, group = apply_to_target(
+                job.project,
+                data,
+                [str(job.pk), data["source"], data["source_sha256"]],
+                lambda target: extract_texts(
+                    job,
+                    target,
+                    source_sha256=data["source_sha256"],
+                    group_state_token=data["group_state"],
+                    mode=data.get("mode"),
+                    confirm_existing=data["confirm_existing"],
+                    source=data["source"],
+                ),
             )
         return Response(
             {
-                "project": project.pk,
+                "project": job.project_id,
+                "group": group.pk,
                 "source": receipt.source_kind,
                 "mode": receipt.mode,
                 "text_ids": receipt.text_ids,

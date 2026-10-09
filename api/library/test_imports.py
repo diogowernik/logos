@@ -21,8 +21,8 @@ from .epub_import.extraction import proposal, section_markdown
 from .epub_import.inspection import report
 from .models import Asset, ImportExtraction, ImportJob, Text
 from .serializers import TextSerializer
-from .services import create_project, new_version
-from .services.exports import export_project_epub
+from .services import create_group, create_project
+from .services.exports import export_group_epub
 
 
 def fixture():
@@ -210,6 +210,7 @@ class ImportApiTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
         self.project = create_project(self.user, "Destino")
+        self.group = self.project.default_group
         self.original, self.image = fixture()
 
     def upload(self, project=None, content=None):
@@ -233,7 +234,7 @@ class ImportApiTests(TestCase):
         return job
 
     def preview(self, job, project=None, source=None):
-        query = {"project": (project or self.project).pk}
+        query = {"group": project.pk if project else self.group.pk}
         if source:
             query["source"] = source
         response = self.client.get(
@@ -244,11 +245,63 @@ class ImportApiTests(TestCase):
         return response.data
 
     def extract(self, job, preview, **extra):
-        data = {
-            key: preview[key] for key in ("project", "source", "source_sha256", "project_state")
-        }
+        data = {key: preview[key] for key in ("group", "source", "source_sha256", "group_state")}
         data.update(extra)
         return self.client.post(f"/api/library/epub-imports/{job.pk}/extract/", data, format="json")
+
+    def test_new_group_import_is_atomic_idempotent_and_preserves_final(self):
+        import uuid
+
+        final = Text.objects.create(group=self.group, markdown="Final revisado")
+        job = self.prepared()
+        preview = self.client.get(
+            f"/api/library/epub-imports/{job.pk}/preview/", {"source": "original"}
+        ).data
+        payload = {k: preview[k] for k in ("source", "source_sha256", "group_state")}
+        payload.update(new_group_name="Extraído", operation_id=str(uuid.uuid4()))
+        first = self.client.post(
+            f"/api/library/epub-imports/{job.pk}/extract/", payload, format="json"
+        )
+        self.assertEqual(first.status_code, 201, first.data)
+        replay = self.client.post(
+            f"/api/library/epub-imports/{job.pk}/extract/", payload, format="json"
+        )
+        self.assertEqual(replay.status_code, 200, replay.data)
+        self.assertEqual(first.data["group"], replay.data["group"])
+        self.assertEqual(self.project.groups.count(), 2)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.default_group_id, self.group.pk)
+        final.refresh_from_db()
+        self.assertEqual(final.markdown, "Final revisado")
+        assets = self.project.assets.count()
+        payload["operation_id"] = str(uuid.uuid4())
+        second = self.client.post(
+            f"/api/library/epub-imports/{job.pk}/extract/", payload, format="json"
+        )
+        self.assertEqual(second.status_code, 201, second.data)
+        self.assertNotEqual(first.data["group"], second.data["group"])
+        self.assertEqual(self.project.assets.count(), assets)
+
+    def test_failed_import_to_new_group_leaves_no_group_or_images(self):
+        import uuid
+
+        job = self.prepared()
+        preview = self.client.get(
+            f"/api/library/epub-imports/{job.pk}/preview/", {"source": "original"}
+        ).data
+        payload = {k: preview[k] for k in ("source", "source_sha256", "group_state")}
+        payload.update(new_group_name="Extraído", operation_id=str(uuid.uuid4()))
+        with patch(
+            "library.services.extraction.Text.objects.bulk_create",
+            side_effect=RuntimeError("failed"),
+        ):
+            response = self.client.post(
+                f"/api/library/epub-imports/{job.pk}/extract/", payload, format="json"
+            )
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(self.project.groups.count(), 1)
+        self.assertEqual(self.project.assets.count(), 0)
+        self.assertFalse(list(self.media.rglob("*.png")))
 
     def test_upload_deduplicates_original_and_exposes_private_downloads(self):
         job = self.prepared()
@@ -261,7 +314,7 @@ class ImportApiTests(TestCase):
             self.assertEqual(response["Cache-Control"], "private, no-store")
             self.assertTrue(b"".join(response.streaming_content))
             response.close()
-        self.assertEqual(self.project.texts.count(), 0)
+        self.assertEqual(self.group.texts.count(), 0)
         self.client.force_authenticate(self.other)
         self.assertEqual(self.client.get(f"/api/library/epub-imports/{job.pk}/").status_code, 404)
         self.assertEqual(self.upload().status_code, 404)
@@ -275,19 +328,19 @@ class ImportApiTests(TestCase):
         job = self.prepared()
         preview = self.preview(job)
         self.assertFalse(preview["requires_confirmation"])
-        self.assertEqual(self.project.texts.count(), 0)
+        self.assertEqual(self.group.texts.count(), 0)
         response = self.extract(job, preview)
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(
-            [t.title for t in self.project.texts.all()], ["Créditos", "Primeiro", "Segundo"]
+            [t.title for t in self.group.texts.all()], ["Créditos", "Primeiro", "Segundo"]
         )
         self.project.refresh_from_db()
         self.assertIsNotNone(self.project.cover)
-        self.assertEqual(self.project.family.assets.count(), 2)
-        markdown = self.project.texts.get(title="Primeiro").markdown
+        self.assertEqual(self.project.assets.count(), 1)
+        markdown = self.group.texts.get(title="Primeiro").markdown
         self.assertIn("/api/library/assets/", markdown)
         self.assertNotIn("epub-resource:", markdown)
-        artifact = export_project_epub(self.project)
+        artifact = export_group_epub(self.group)
         with ZipFile(artifact.file.path) as archive:
             self.assertTrue(any("images/" in p for p in archive.namelist()))
             all_html = b"".join(archive.read(p) for p in archive.namelist() if p.endswith(".xhtml"))
@@ -296,16 +349,16 @@ class ImportApiTests(TestCase):
         self.assertEqual(replay.status_code, 200, replay.data)
         self.assertTrue(replay.data["reused"])
         self.assertEqual(replay.data["text_ids"], response.data["text_ids"])
-        self.assertEqual(self.project.texts.count(), 3)
+        self.assertEqual(self.group.texts.count(), 3)
         self.assertEqual(ImportExtraction.objects.count(), 1)
-        self.assertEqual(self.project.family.assets.count(), 2)
+        self.assertEqual(self.project.assets.count(), 1)
 
     def test_existing_texts_require_choice_confirmation_and_fresh_preview(self):
         existing = Text.objects.create(
-            project=self.project, title="Meu texto", markdown="Original", position=8
+            group=self.group, title="Meu texto", markdown="Original", position=8
         )
         variation = Text.objects.create(
-            project=self.project, parent=existing, title="Variação", markdown="Outra"
+            group=self.group, parent=existing, title="Variação", markdown="Outra"
         )
         job = self.prepared()
         preview = self.preview(job)
@@ -321,23 +374,23 @@ class ImportApiTests(TestCase):
         response = self.extract(job, fresh, mode="append", confirm_existing=True)
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(Text.objects.filter(pk=variation.pk).exists())
-        self.assertEqual(self.project.texts.get(title="Créditos").position, 9)
+        self.assertEqual(self.group.texts.get(title="Créditos").position, 9)
         existing.refresh_from_db()
         self.assertEqual(existing.markdown, "Alterado depois da prévia")
 
     def test_replacement_requires_confirmation_and_removes_variations_atomically(self):
-        existing = Text.objects.create(project=self.project, title="Antigo", markdown="Texto")
-        variation = Text.objects.create(project=self.project, parent=existing, title="Variação")
+        existing = Text.objects.create(group=self.group, title="Antigo", markdown="Texto")
+        variation = Text.objects.create(group=self.group, parent=existing, title="Variação")
         job = self.prepared()
         preview = self.preview(job)
         response = self.extract(job, preview, mode="replace", confirm_existing=True)
         self.assertEqual(response.status_code, 201, response.data)
         self.assertFalse(Text.objects.filter(pk__in=[existing.pk, variation.pk]).exists())
-        self.assertEqual(self.project.texts.count(), 3)
+        self.assertEqual(self.group.texts.count(), 3)
         self.assertTrue(Path(job.original_file.path).exists())
 
     def test_stale_editor_cannot_recreate_a_text_replaced_by_import(self):
-        old = Text.objects.create(project=self.project, title="Antigo", markdown="Texto")
+        old = Text.objects.create(group=self.group, title="Antigo", markdown="Texto")
         stale = Text.objects.get(pk=old.pk)
         serializer = TextSerializer(stale, context={"request": SimpleNamespace(user=self.user)})
         job = self.prepared()
@@ -363,7 +416,7 @@ class ImportApiTests(TestCase):
         self.assertEqual(self.extract(job, preview).status_code, 409)
         response = self.extract(job, preview, mode="replace", confirm_existing=True)
         self.assertEqual(response.status_code, 201, response.data)
-        self.assertEqual(self.project.texts.count(), 1)
+        self.assertEqual(self.group.texts.count(), 1)
         self.assertEqual(ImportExtraction.objects.count(), 2)
 
     def test_clean_database_failure_removes_new_file_and_keeps_last_good_copy(self):
@@ -391,7 +444,7 @@ class ImportApiTests(TestCase):
         self.assertEqual({p for p in self.media.rglob("*") if p.is_file()}, before_files)
 
     def test_failure_rolls_back_text_replacement_and_cleans_new_image_files(self):
-        old = Text.objects.create(project=self.project, title="Preservado", markdown="Texto")
+        old = Text.objects.create(group=self.group, title="Preservado", markdown="Texto")
         job = self.prepared()
         preview = self.preview(job)
         before = set(self.media.rglob("*"))
@@ -460,11 +513,11 @@ class ImportApiTests(TestCase):
         result = self.extract(job, preview)
         self.assertEqual(result.status_code, 201, result.data)
         self.assertEqual(result.data["source"], "original")
-        self.assertEqual(self.project.texts.count(), 3)
+        self.assertEqual(self.group.texts.count(), 3)
         receipt = ImportExtraction.objects.get()
         self.assertEqual(receipt.source_kind, "original")
         self.assertEqual(receipt.source_sha256, job.sha256)
-        self.assertEqual(self.project.family.assets.count(), 2)
+        self.assertEqual(self.project.assets.count(), 1)
         job.refresh_from_db()
         self.assertFalse(job.clean_file)
         self.assertEqual(job.clean_generation, 0)
@@ -485,14 +538,14 @@ class ImportApiTests(TestCase):
         self.assertEqual(self.extract(job, cleaned).status_code, 409)
         result = self.extract(job, cleaned, mode="append", confirm_existing=True)
         self.assertEqual(result.status_code, 201, result.data)
-        self.assertEqual(self.project.texts.count(), 6)
+        self.assertEqual(self.group.texts.count(), 6)
         self.assertEqual(
             set(ImportExtraction.objects.values_list("source_kind", flat=True)),
             {"original", "cleaned"},
         )
         replay = self.extract(job, original)
         self.assertEqual(replay.status_code, 200)
-        self.assertEqual(self.project.texts.count(), 6)
+        self.assertEqual(self.group.texts.count(), 6)
 
     def test_original_extraction_is_independent_of_failed_cleaning_and_invalid_sources(self):
         job = ImportJob.objects.get(pk=self.upload().data["id"])
@@ -506,12 +559,12 @@ class ImportApiTests(TestCase):
         self.assertEqual(self.extract(job, preview).status_code, 201)
         invalid = self.client.get(
             f"/api/library/epub-imports/{job.pk}/preview/",
-            {"project": self.project.pk, "source": "other"},
+            {"group": self.group.pk, "source": "other"},
         )
         self.assertEqual(invalid.status_code, 400)
         missing_clean = self.client.get(
             f"/api/library/epub-imports/{job.pk}/preview/",
-            {"project": self.project.pk, "source": "cleaned"},
+            {"group": self.group.pk, "source": "cleaned"},
         )
         self.assertEqual(missing_clean.status_code, 400)
         self.assertEqual(missing_clean.data["diagnostic"]["source"], "cleaned")
@@ -548,9 +601,9 @@ class ImportApiTests(TestCase):
 
     def test_versions_share_sources_but_unrelated_and_foreign_targets_are_rejected(self):
         job = self.prepared()
-        version = new_version(self.project)
+        version = create_group(self.project)
         self.assertEqual(
-            len(self.client.get(f"/api/library/projects/{version.pk}/imports/").data), 1
+            len(self.client.get(f"/api/library/projects/{self.project.pk}/imports/").data), 1
         )
         preview = self.preview(job, version)
         self.assertEqual(self.extract(job, preview).status_code, 201)
@@ -558,10 +611,10 @@ class ImportApiTests(TestCase):
         foreign = create_project(self.other)
         for target in (unrelated, foreign):
             response = self.client.get(
-                f"/api/library/epub-imports/{job.pk}/preview/", {"project": target.pk}
+                f"/api/library/epub-imports/{job.pk}/preview/", {"group": target.default_group_id}
             )
             self.assertEqual(response.status_code, 404)
-        self.assertEqual(self.project.texts.count(), 0)
+        self.assertEqual(self.group.texts.count(), 0)
 
     def test_invalid_upload_and_clean_without_selected_content_leave_no_files(self):
         self.assertEqual(self.upload(content=b"bad zip").status_code, 400)

@@ -4,170 +4,150 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Project, ProjectFamily, Text
-from .services import compile_project, create_project, new_version
+from .models import Project, Text, TextGroup
+from .services import compile_group, create_group, create_project, duplicate_group
 
 
-class LibraryTests(TestCase):
+class DomainTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username="writer")
-        self.other = get_user_model().objects.create_user(username="other")
+        self.user = get_user_model().objects.create_user(username="owner", password="secret")
+        self.other = get_user_model().objects.create_user(username="other", password="secret")
         self.client = APIClient()
         self.client.force_authenticate(self.user)
+        self.project = create_project(self.user, "Livro")
+        self.group = self.project.default_group
 
-    def test_compilation_uses_only_ordered_markdown_without_registered_titles(self):
-        project = create_project(self.user, "Título cadastrado")
-        project.subtitle = "Subtítulo cadastrado"
-        project.save()
-        Text.objects.create(project=project, title="Outro título", markdown="## Parte\n\nSegundo.", position=1)
-        first = Text.objects.create(project=project, title="Título do texto", markdown="# Capítulo\n\nPrimeiro.", position=0)
-        Text.objects.create(project=project, title="Sem conteúdo", markdown="", position=2)
-        Text.objects.create(project=project, parent=first, markdown="VARIAÇÃO")
+    def test_empty_group_does_not_change_default_or_existing_texts(self):
+        text = Text.objects.create(group=self.group, markdown="Final")
+        extra = create_group(self.project, "Extraído")
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.default_group_id, self.group.pk)
+        self.assertEqual(extra.texts.count(), 0)
+        self.assertEqual(text.markdown, "Final")
+        self.assertEqual(len(self.client.get("/api/library/projects/").data), 1)
+
+    def test_duplicate_group_is_independent_and_preserves_variations(self):
+        main = Text.objects.create(group=self.group, title="A", markdown="# A", position=3)
+        Text.objects.create(group=self.group, parent=main, markdown="Variation")
+        extra = duplicate_group(self.group)
+        copied = extra.texts.get(parent=None)
+        copied.markdown = "Revisado"
+        copied.save()
+        main.refresh_from_db()
+        self.assertEqual(main.markdown, "# A")
+        self.assertEqual(copied.position, 3)
+        self.assertEqual(copied.variations.count(), 1)
+        self.assertNotIn("Variation", compile_group(extra).markdown())
+
+    def test_group_delete_and_default_are_separate_from_book_delete(self):
+        extra = create_group(self.project, "Outra")
+        endpoint = f"/api/library/groups/{self.group.pk}/"
+        self.assertEqual(self.client.delete(endpoint).status_code, 400)
         self.assertEqual(
-            compile_project(project).markdown(),
-            "# Capítulo\n\nPrimeiro.\n\n## Parte\n\nSegundo.\n",
+            self.client.post(f"/api/library/groups/{extra.pk}/default/").status_code, 200
         )
-        self.assertEqual(self.client.get(f"/api/library/texts/{first.pk}/").data["compiled_markdown"], first.markdown)
+        self.assertEqual(self.client.delete(endpoint).status_code, 204)
+        self.assertTrue(Project.objects.filter(pk=self.project.pk).exists())
+        self.assertEqual(self.client.delete(f"/api/library/groups/{extra.pk}/").status_code, 400)
 
-    def test_simple_write_edit_and_compile_without_editorial_metadata(self):
-        response = self.client.post("/api/library/projects/", {}, format="json")
-        self.assertEqual(response.status_code, 201)
-        project = Project.objects.get(pk=response.data["id"])
-        text = self.client.post(
-            "/api/library/texts/",
-            {"project": project.pk, "title": "Ideia", "markdown": "## Ideia\n\nTexto livre."},
-            format="json",
-        )
-        self.assertEqual(text.status_code, 201)
-        edit = self.client.patch(
-            f"/api/library/texts/{text.data['id']}/",
-            {"markdown": "## Ideia\n\nEditado."},
-            format="json",
-        )
-        self.assertEqual(edit.status_code, 200)
-        compiled = self.client.get(f"/api/library/projects/{project.pk}/markdown/").data["markdown"]
-        self.assertEqual(compiled.count("## Ideia"), 1)
-        self.assertIn("Editado.", compiled)
+    def test_compilation_uses_selected_group_order_and_only_body(self):
+        a = Text.objects.create(group=self.group, title="Cadastro", markdown="# Um", position=1)
+        Text.objects.create(group=self.group, markdown="# Dois", position=0)
+        Text.objects.create(group=self.group, parent=a, markdown="Variação")
+        extra = create_group(self.project, "Outra")
+        Text.objects.create(group=extra, markdown="Final")
+        self.assertEqual(compile_group(self.group).markdown(), "# Dois\n\n# Um\n")
+        self.assertEqual(compile_group(extra).markdown(), "Final\n")
 
-    def test_content_and_relations_are_private(self):
-        foreign = create_project(self.other, "Private")
-        text = Text.objects.create(project=foreign, markdown="private")
-        self.assertEqual(
-            self.client.get(f"/api/library/projects/{foreign.pk}/content/").status_code, 404
-        )
-        self.assertEqual(self.client.get(f"/api/library/texts/{text.pk}/").status_code, 404)
+    def test_owner_isolation_across_group_and_text_endpoints(self):
+        foreign = create_project(self.other)
+        text = Text.objects.create(group=foreign.default_group, markdown="private")
+        for endpoint in [
+            f"projects/{foreign.pk}/content",
+            f"groups/{foreign.default_group_id}",
+            f"texts/{text.pk}",
+        ]:
+            self.assertEqual(self.client.get(f"/api/library/{endpoint}/").status_code, 404)
         self.assertEqual(
             self.client.post(
-                "/api/library/texts/", {"project": foreign.pk, "markdown": "wrong"}, format="json"
+                "/api/library/texts/", {"group": foreign.default_group_id}, format="json"
             ).status_code,
             400,
         )
-        self.assertEqual(len(self.client.get("/api/library/projects/").data), 0)
-
-    def test_new_main_is_empty_and_can_be_restored(self):
-        project = create_project(self.user, "Original")
-        Text.objects.create(project=project, markdown="Keep this")
-        replacement = new_version(project)
-        self.assertEqual(replacement.texts.count(), 0)
-        self.assertEqual(project.texts.get().markdown, "Keep this")
         self.assertEqual(
-            ProjectFamily.objects.get(pk=project.family_id).principal_id, replacement.pk
+            self.client.post(
+                "/api/library/groups/", {"project": foreign.pk}, format="json"
+            ).status_code,
+            400,
         )
-        self.assertEqual(len(self.client.get("/api/library/projects/").data), 1)
-        response = self.client.post(f"/api/library/projects/{project.pk}/restore/")
-        self.assertTrue(response.data["is_principal"])
-        self.client.delete(f"/api/library/projects/{replacement.pk}/")
-        self.assertTrue(Project.objects.filter(pk=project.pk).exists())
 
-    def test_failed_new_version_keeps_previous_main(self):
-        project = create_project(self.user, "Original")
-        with patch("library.services.projects.ProjectFamily.save", side_effect=RuntimeError("failed")):
-            with self.assertRaises(RuntimeError):
-                new_version(project)
-        self.assertEqual(Project.objects.count(), 1)
-        self.assertEqual(ProjectFamily.objects.get(pk=project.family_id).principal_id, project.pk)
+    def test_texts_create_save_variations_promote_and_search(self):
+        response = self.client.post(
+            "/api/library/texts/", {"group": self.group.pk, "markdown": "agulha"}, format="json"
+        )
+        self.assertEqual(response.status_code, 201)
+        text_id = response.data["id"]
+        variation = self.client.post(f"/api/library/texts/{text_id}/duplicate/").data
+        self.assertEqual(
+            self.client.post(
+                "/api/library/texts/",
+                {"group": self.group.pk, "parent": variation["id"]},
+                format="json",
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.client.patch(
+                f"/api/library/texts/{variation['id']}/", {"parent": None}, format="json"
+            ).status_code,
+            200,
+        )
+        self.assertEqual(len(self.client.get("/api/library/texts/?search=agulha").data), 2)
+        self.assertEqual(
+            self.client.get(f"/api/library/texts/{text_id}/").data["project"], self.project.pk
+        )
 
-    def test_variations_are_excluded_and_only_one_level_is_allowed(self):
-        project = create_project(self.user)
-        text = Text.objects.create(project=project, markdown="MAIN")
-        variant = self.client.post(f"/api/library/texts/{text.pk}/duplicate/").data
-        self.client.patch(
-            f"/api/library/texts/{variant['id']}/", {"markdown": "VARIANT"}, format="json"
-        )
-        self.assertNotIn("VARIANT", compile_project(project).markdown())
-        nested = self.client.post(
-            "/api/library/texts/", {"project": project.pk, "parent": variant["id"]}, format="json"
-        )
-        self.assertEqual(nested.status_code, 400)
-        promote = self.client.patch(
-            f"/api/library/texts/{variant['id']}/", {"parent": None}, format="json"
-        )
-        self.assertEqual(promote.status_code, 200)
-        self.assertIn("VARIANT", compile_project(project).markdown())
-
-    def test_reorder_requires_complete_list_and_move_carries_variations(self):
-        project = create_project(self.user)
-        target = create_project(self.user, "Destination")
-        a = Text.objects.create(project=project, markdown="A", position=0)
-        b = Text.objects.create(project=project, markdown="B", position=1)
-        variant = Text.objects.create(project=project, parent=a, markdown="variation")
-        endpoint = f"/api/library/projects/{project.pk}/reorder/"
+    def test_reorder_is_local_and_move_carries_variations(self):
+        a = Text.objects.create(group=self.group, markdown="A")
+        b = Text.objects.create(group=self.group, markdown="B", position=1)
+        variant = Text.objects.create(group=self.group, parent=a, markdown="V")
+        extra = create_group(self.project, "Outra")
+        endpoint = f"/api/library/groups/{self.group.pk}/reorder/"
         self.assertEqual(
             self.client.post(endpoint, {"ids": [b.pk]}, format="json").status_code, 400
         )
         self.assertEqual(
             self.client.post(endpoint, {"ids": [b.pk, a.pk]}, format="json").status_code, 200
         )
-        self.assertLess(
-            compile_project(project).markdown().index("B"),
-            compile_project(project).markdown().index("A"),
-        )
         self.assertEqual(
             self.client.post(
-                f"/api/library/texts/{a.pk}/move/", {"project": target.pk}, format="json"
+                f"/api/library/texts/{a.pk}/move/", {"group": extra.pk}, format="json"
             ).status_code,
             200,
         )
         variant.refresh_from_db()
-        self.assertEqual(variant.project_id, target.pk)
+        self.assertEqual(variant.group_id, extra.pk)
 
-    def test_inbox_is_stable_and_collection_deletion_keeps_projects(self):
+    def test_inbox_remains_stable_and_loose_texts_can_move_to_book(self):
         first = self.client.post("/api/library/projects/inbox/").data
         second = self.client.post("/api/library/projects/inbox/").data
         self.assertEqual(first["id"], second["id"])
-        collection = self.client.post("/api/library/collections/", {"title": "Folder"}).data
-        project = self.client.post(
-            "/api/library/projects/",
-            {"title": "Book", "collection": collection["id"]},
-            format="json",
-        ).data
-        self.client.delete(f"/api/library/collections/{collection['id']}/")
-        self.assertTrue(Project.objects.filter(pk=project["id"]).exists())
-
-    def test_recents_search_and_loose_texts_remain_private_and_movable(self):
-        loose_project = Project.objects.get(pk=self.client.post("/api/library/projects/inbox/").data["id"])
-        loose = Text.objects.create(project=loose_project, title="Ideia solta", markdown="agulha")
-        project = create_project(self.user, "Livro")
-        chapter = Text.objects.create(project=project, title="Capítulo", markdown="agulha")
-        Text.objects.create(project=project, parent=chapter, title="Variação")
-        Text.objects.create(project=create_project(self.other), title="Privado", markdown="agulha")
-        self.client.post(f"/api/library/texts/{loose.pk}/open/")
-        recent = self.client.get("/api/library/texts/recent/").data
-        self.assertEqual([item["id"] for item in recent], [loose.pk, chapter.pk])
-        self.assertTrue(recent[0]["is_loose"])
-        self.assertNotIn("markdown", recent[0])
-        self.assertEqual(len(self.client.get("/api/library/texts/?search=agulha").data), 2)
+        loose = Text.objects.create(group_id=first["default_group"], markdown="Ideia")
         self.assertEqual(len(self.client.get("/api/library/texts/?loose=1").data), 1)
-        self.client.post(f"/api/library/texts/{loose.pk}/move/", {"project": project.pk}, format="json")
-        self.assertEqual(self.client.get("/api/library/texts/?loose=1").data, [])
-        self.assertFalse(self.client.get("/api/library/texts/recent/").data[0]["is_loose"])
-        self.assertIn("agulha", compile_project(project).markdown())
+        self.assertEqual(
+            self.client.post(
+                f"/api/library/texts/{loose.pk}/move/", {"project": self.project.pk}, format="json"
+            ).status_code,
+            200,
+        )
+        self.assertEqual(len(self.client.get("/api/library/texts/?loose=1").data), 0)
 
-    def test_reader_uses_compilation_and_recents_exclude_secondary_versions(self):
-        project = create_project(self.user, "Livro")
-        text = Text.objects.create(project=project, title="Capítulo", markdown="## Capítulo\n\nConteúdo.")
-        compiled_text = self.client.get(f"/api/library/texts/{text.pk}/").data["compiled_markdown"]
-        self.assertEqual(compiled_text.count("## Capítulo"), 1)
-        self.assertIn(compiled_text, compile_project(project).markdown())
-        new_version(project)
-        self.assertEqual(self.client.get("/api/library/texts/recent/").data, [])
+    def test_failed_duplicate_leaves_existing_groups_intact(self):
+        Text.objects.create(group=self.group, markdown="Keep")
+        with patch(
+            "library.services.groups.Text.objects.create", side_effect=RuntimeError("failed")
+        ):
+            with self.assertRaises(RuntimeError):
+                duplicate_group(self.group)
+        self.assertEqual(TextGroup.objects.filter(project=self.project).count(), 1)
+        self.assertEqual(self.group.texts.get().markdown, "Keep")

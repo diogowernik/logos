@@ -41,12 +41,12 @@ def source_order(name):
 
 
 def storage_name(project, kind, name):
-    return "/".join(("projects", str(project.family_id), *FOLDERS[kind], name))
+    return "/".join(("projects", str(project.pk), *FOLDERS[kind], name))
 
 
 @contextmanager
 def directory(project, kind, create=False):
-    if project.family.is_inbox:
+    if project.is_inbox:
         raise ValidationError("Escolha um projeto para gerenciar fontes.")
     try:
         root = default_storage.path("")
@@ -58,7 +58,7 @@ def directory(project, kind, create=False):
         Path(root).mkdir(parents=True, exist_ok=True)
     fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        for part in ("projects", str(project.family_id), *FOLDERS[kind]):
+        for part in ("projects", str(project.pk), *FOLDERS[kind]):
             if create:
                 try:
                     os.mkdir(part, dir_fd=fd)
@@ -147,7 +147,7 @@ def markdown_title(name):
 def upload_markdowns(project, files):
     from django.db import transaction
 
-    from ..models import ProjectFamily
+    from ..models import Project
 
     if not files or len(files) > MAX_FILES:
         raise ValidationError("Envie de 1 a 100 arquivos Markdown.")
@@ -165,7 +165,7 @@ def upload_markdowns(project, files):
         raise ValidationError("O lote deve ter até 16 MB.")
     created = []
     with transaction.atomic():
-        ProjectFamily.objects.select_for_update().get(pk=project.family_id)
+        Project.objects.select_for_update().get(pk=project.pk)
         with directory(project, "markdown", create=True) as fd:
             existing_names = {n for n in os.listdir(fd) if n.lower().endswith(".md")}
             if len(existing_names | prepared.keys()) > MAX_FILES:

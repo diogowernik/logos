@@ -8,6 +8,7 @@ from rest_framework.response import Response
 
 from .import_errors import import_operation
 from .import_serializers import ImportJobSerializer
+from .services.import_targets import apply_to_target, target_group
 from .services.local_sources import adopt_epub, epub_catalog
 from .services.markdown_sources import import_markdowns, markdown_catalog, preview_markdowns
 from .services.source_files import read_file, upload_markdowns
@@ -49,7 +50,9 @@ class ProjectSourcesMixin:
         ):
             if request.method == "POST":
                 upload_markdowns(project, request.FILES.getlist("files"))
-            entries = markdown_catalog(project)
+            entries = markdown_catalog(
+                project, target_group(project, request.query_params.get("group"))
+            )
         return Response(entries, status=201 if request.method == "POST" else 200)
 
     @action(detail=True, methods=["get"], url_path="markdown-file")
@@ -69,7 +72,8 @@ class ProjectSourcesMixin:
         serializer = MarkdownSelectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         with import_operation("preview", "markdown"):
-            result = preview_markdowns(project, serializer.validated_data["files"])
+            group = target_group(project, request.data.get("group"))
+            result = preview_markdowns(project, serializer.validated_data["files"], group)
         return Response(result)
 
     @action(detail=True, methods=["post"], url_path="markdown-import")
@@ -79,17 +83,23 @@ class ProjectSourcesMixin:
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         with import_operation("extract", "markdown"):
-            receipt, created = import_markdowns(
+            receipt, created, group = apply_to_target(
                 project,
-                data["files"],
-                data["source_sha256"],
-                data["project_state"],
-                data.get("mode"),
-                data["confirm_existing"],
+                data,
+                ["markdown", data["files"], data["source_sha256"]],
+                lambda target: import_markdowns(
+                    target,
+                    data["files"],
+                    data["source_sha256"],
+                    data["group_state"],
+                    data.get("mode"),
+                    data["confirm_existing"],
+                ),
             )
         return Response(
             {
                 "project": project.pk,
+                "group": group.pk,
                 "source": "markdown",
                 "mode": receipt.mode,
                 "text_ids": [f["text"] for f in receipt.files],

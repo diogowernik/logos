@@ -3,6 +3,7 @@ from rest_framework import serializers
 from .epub_import.archive import MAX_UPLOAD
 from .models import ImportJob
 from .services.import_sources import DEFAULT_SOURCE, SOURCE_CHOICES
+from .target_serializers import ImportTargetSerializer
 
 
 class EpubUploadSerializer(serializers.Serializer):
@@ -33,12 +34,8 @@ class ImportResourceSerializer(ImportSourceSerializer):
     source_sha256 = serializers.RegexField(r"^[a-f0-9]{64}$", required=False)
 
 
-class ExtractImportSerializer(ImportSourceSerializer):
-    project = serializers.IntegerField(min_value=1)
+class ExtractImportSerializer(ImportTargetSerializer, ImportSourceSerializer):
     source_sha256 = serializers.RegexField(r"^[a-f0-9]{64}$")
-    project_state = serializers.RegexField(r"^[a-f0-9]{64}$")
-    mode = serializers.ChoiceField(choices=["append", "replace"], required=False)
-    confirm_existing = serializers.BooleanField(default=False)
 
 
 class ImportJobSerializer(serializers.ModelSerializer):
@@ -76,7 +73,7 @@ class ImportJobSerializer(serializers.ModelSerializer):
     def get_extractions(self, obj):
         return list(
             obj.extractions.values(
-                "project_id",
+                "group_id",
                 "source_kind",
                 "source_sha256",
                 "mode",

@@ -1,4 +1,4 @@
-"""EPUB discovery and explicit adoption of a family's original files."""
+"""EPUB discovery and explicit adoption of a book's original files."""
 
 from pathlib import PurePosixPath
 
@@ -7,7 +7,7 @@ from .source_files import digest, list_files, read_file, storage_name
 
 
 def epub_catalog(project):
-    jobs = list(project.family.imports.all())
+    jobs = list(project.imports.all())
     by_path = {job.original_file.name: job for job in jobs}
     by_digest = {job.sha256: job for job in jobs}
     entries = list_files(project, "epub")
@@ -47,7 +47,7 @@ def adopt_epub(project, name, expected_sha):
     if digest(content) != expected_sha:
         raise ImportConflict("O arquivo mudou. Atualize a lista antes de vinculá-lo.")
     path = storage_name(project, "epub", name)
-    previous = project.family.imports.filter(original_file=path).first()
+    previous = project.imports.filter(original_file=path).first()
     if previous and previous.sha256 != expected_sha:
         raise ImportConflict(
             "Esta fonte cadastrada foi alterada. Envie-a com outro nome para preservar o original."

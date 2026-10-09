@@ -10,7 +10,7 @@ class AssetViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AssetSerializer
 
     def get_queryset(self):
-        return Asset.objects.filter(family__owner=self.request.user)
+        return Asset.objects.filter(project__owner=self.request.user)
 
     @action(detail=True, methods=["get"])
     def file(self, request, pk=None):

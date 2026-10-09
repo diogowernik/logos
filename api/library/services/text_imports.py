@@ -1,4 +1,4 @@
-"""Shared confirmation contract for any source that creates project Texts."""
+"""Shared confirmation contract for any source that creates group Texts."""
 
 import hashlib
 import json
@@ -6,9 +6,11 @@ import json
 from .imports import ImportConflict
 
 
-def project_state(project):
-    texts = list(
-        project.texts.order_by("id").values("id", "parent_id", "title", "markdown", "position")
+def group_state(group):
+    texts = (
+        list(group.texts.order_by("id").values("id", "parent_id", "title", "markdown", "position"))
+        if group
+        else []
     )
     digest = hashlib.sha256(
         json.dumps(texts, ensure_ascii=False, sort_keys=True).encode()
@@ -16,8 +18,8 @@ def project_state(project):
     return digest, len(texts), sum(text["parent_id"] is None for text in texts)
 
 
-def confirmed_mode(project, state_token, mode, confirmed):
-    state, count, _ = project_state(project)
+def confirmed_mode(group, state_token, mode, confirmed):
+    state, count, _ = group_state(group)
     if state != state_token:
         raise ImportConflict("Os textos do projeto mudaram. Atualize a prévia antes de continuar.")
     if count and (mode is None or not confirmed):

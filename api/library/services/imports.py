@@ -12,7 +12,7 @@ from ..epub_import.archive import MAX_UPLOAD, read_package
 from ..epub_import.cleaning import clean_package
 from ..epub_import.inspection import report
 from ..import_errors import diagnostic as build_diagnostic
-from ..models import ImportJob, ProjectFamily
+from ..models import ImportJob, Project
 
 
 class ImportConflict(APIException):
@@ -22,7 +22,7 @@ class ImportConflict(APIException):
 
 
 def upload_epub(project, uploaded):
-    if project.family.is_inbox:
+    if project.is_inbox:
         raise ValidationError("Escolha um projeto para importar o EPUB.")
     if uploaded.size > MAX_UPLOAD:
         raise ValidationError("O EPUB deve ter até 50 MB.")
@@ -38,8 +38,8 @@ def register_epub(project, content, original_name, existing_name=None):
     job, new_name = None, None
     try:
         with transaction.atomic():
-            ProjectFamily.objects.select_for_update().get(pk=project.family_id)
-            existing = ImportJob.objects.filter(family=project.family, sha256=digest).first()
+            Project.objects.select_for_update().get(pk=project.pk)
+            existing = ImportJob.objects.filter(project=project, sha256=digest).first()
             if existing:
                 if existing_name and not existing.original_file.storage.exists(
                     existing.original_file.name
@@ -48,7 +48,7 @@ def register_epub(project, content, original_name, existing_name=None):
                     existing.save(update_fields=["original_file", "updated_at"])
                 return existing, False
             job = ImportJob(
-                family=project.family,
+                project=project,
                 original_name=original_name,
                 sha256=digest,
                 inspection=diagnostic,

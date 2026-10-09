@@ -1,22 +1,21 @@
-"""Preview and confirmed, idempotent application of an EPUB proposal to an existing Project."""
+"""Preview and confirmed, idempotent application of an EPUB proposal to an existing TextGroup."""
 
 from pathlib import PurePosixPath
 from urllib.parse import quote
 
-from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from ..epub_import.extraction import proposal, section_markdown
-from ..models import Asset, ImportExtraction, ImportJob, Project, Text
+from ..models import ImportExtraction, ImportJob, Project, Text, TextGroup
 from .import_sources import DEFAULT_SOURCE, source_content, source_digest, source_warnings
 from .imports import ImportConflict
-from .text_imports import confirmed_mode, project_state
+from .text_imports import confirmed_mode, group_state
 
 
-def preview_extraction(job, project, source=DEFAULT_SOURCE):
+def preview_extraction(job, group, source=DEFAULT_SOURCE):
     prepared = proposal(source_content(job, source))
     digest = source_digest(job, source)
     image_urls = {
@@ -26,15 +25,15 @@ def preview_extraction(job, project, source=DEFAULT_SOURCE):
         )
         for path in prepared["images"]
     }
-    state, count, primary = project_state(project)
+    state, count, primary = group_state(group)
     sections = [
         dict(href=s["href"], title=s["title"], position=i, markdown=section_markdown(s, image_urls))
         for i, s in enumerate(prepared["sections"])
     ]
     return {
-        "project": project.pk,
+        "group": group.pk if group else None,
         "source": source,
-        "project_state": state,
+        "group_state": state,
         "existing_text_count": count,
         "existing_primary_count": primary,
         "requires_confirmation": bool(count),
@@ -46,86 +45,104 @@ def preview_extraction(job, project, source=DEFAULT_SOURCE):
 
 def extract_texts(
     job,
-    project,
+    group,
     *,
     source_sha256,
-    project_state_token: str,
+    group_state_token: str,
     mode=None,
     confirm_existing=False,
     source=DEFAULT_SOURCE,
 ):
-    if project.family_id != job.family_id or project.family.is_inbox:
+    if group.project_id != job.project_id or group.project.is_inbox:
         raise ValidationError("Escolha um projeto da mesma família da fonte.")
     prepared = proposal(source_content(job, source))
     created_assets = []
     try:
         with transaction.atomic():
+            Project.objects.select_for_update().get(pk=group.project_id)
             locked = ImportJob.objects.select_for_update().get(pk=job.pk)
-            project = Project.objects.select_for_update().get(pk=project.pk)
+            group = TextGroup.objects.select_for_update().get(pk=group.pk)
             if source_digest(locked, source) != source_sha256:
                 raise ImportConflict("O EPUB foi alterado. Atualize a prévia da extração.")
             if source_digest(job, source) != source_digest(locked, source):
                 raise ImportConflict("O EPUB mudou durante a preparação. Atualize a prévia.")
             receipt = ImportExtraction.objects.filter(
-                job=locked, project=project, source_kind=source, source_sha256=source_sha256
+                job=locked, group=group, source_kind=source, source_sha256=source_sha256
             ).first()
             if receipt:
                 if mode and receipt.mode != mode:
                     raise ImportConflict(
                         "Esta extração já foi concluída com outra opção. Atualize o projeto."
                     )
-                if project.texts.filter(pk__in=receipt.text_ids).count() != len(receipt.text_ids):
+                if group.texts.filter(pk__in=receipt.text_ids).count() != len(receipt.text_ids):
                     raise ImportConflict(
                         "Textos da extração anterior foram removidos. Revise o projeto."
                     )
                 return receipt, False
-            mode = confirmed_mode(project, project_state_token, mode, confirm_existing)
+            mode = confirmed_mode(group, group_state_token, mode, confirm_existing)
             urls = {}
 
-            def save_image(path, content, mime_type):
-                asset = Asset(
-                    family=project.family,
-                    original_name=PurePosixPath(path).name[:255],
-                    mime_type=mime_type,
-                )
-                asset.file.save(asset.original_name, ContentFile(content), save=False)
-                created_assets.append(asset)
-                asset.save()
-                return asset
+            from .assets import store_image
 
             for path, (content, mime_type) in prepared["images"].items():
-                asset = save_image(path, content, mime_type)
+                asset, created = store_image(
+                    group.project,
+                    PurePosixPath(path).name[:255],
+                    content,
+                    mime_type,
+                    origin={
+                        "job": str(job.pk),
+                        "source": source,
+                        "sha256": source_sha256,
+                        "href": path,
+                    },
+                )
+                if created:
+                    created_assets.append(asset)
                 urls[path] = f"/api/library/assets/{asset.pk}/file"
-            if prepared["cover"] and not project.cover_id:
+            if prepared["cover"] and not group.project.cover_id:
                 path, content, mime_type = prepared["cover"]
-                if path in urls:
-                    project.cover_id = next(
-                        a.pk
-                        for a in created_assets
-                        if urls[path] == f"/api/library/assets/{a.pk}/file"
-                    )
-                else:
-                    project.cover = save_image(path, content, mime_type)
+                asset, created = store_image(
+                    group.project,
+                    PurePosixPath(path).name[:255],
+                    content,
+                    mime_type,
+                    origin={
+                        "job": str(job.pk),
+                        "source": source,
+                        "sha256": source_sha256,
+                        "href": path,
+                    },
+                )
+                if created:
+                    created_assets.append(asset)
+                group.project.cover = asset
+                group.project.save(update_fields=["cover", "updated_at"])
             if mode == "replace":
-                project.texts.all().delete()
-            position = (
-                project.texts.filter(parent=None).aggregate(p=Max("position"))["p"] or 0
-            ) + 1
+                group.texts.all().delete()
+            position = (group.texts.filter(parent=None).aggregate(p=Max("position"))["p"] or 0) + 1
             texts = [
                 Text(
-                    project=project,
+                    group=group,
                     title=s["title"][:250],
                     markdown=section_markdown(s, urls),
+                    origin={
+                        "kind": "epub",
+                        "job": str(job.pk),
+                        "source": source,
+                        "sha256": source_sha256,
+                        "href": s["href"],
+                    },
                     position=position + i,
                 )
                 for i, s in enumerate(prepared["sections"])
             ]
             Text.objects.bulk_create(texts)
-            project.updated_at = timezone.now()
-            project.save(update_fields=["cover", "updated_at"])
+            group.updated_at = timezone.now()
+            group.save(update_fields=["updated_at"])
             receipt = ImportExtraction.objects.create(
                 job=locked,
-                project=project,
+                group=group,
                 source_sha256=source_sha256,
                 source_kind=source,
                 mode=mode,

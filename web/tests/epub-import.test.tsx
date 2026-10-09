@@ -183,3 +183,21 @@ it("makes the technical text selectable when clipboard copying is unavailable", 
   await screen.findByText("Selecione os detalhes abaixo e copie manualmente.");
   expect(screen.getByText(diagnostic.copy_text)).toBeVisible();
 });
+
+
+it("opens original and cleaned source reading without extracting or cleaning", async () => {
+  const user = userEvent.setup();
+  const read = vi.fn();
+  const clean = {...job, clean_url: "/clean", clean_filename: "fonte_clean.epub"};
+  mocks.request.mockResolvedValue(preview);
+  render(<ProjectEpubs projectId={1} groupId={1} groups={[group]} jobs={[clean]} onRead={read} onJob={vi.fn()} onExtracted={mocks.extracted} onBusy={mocks.busy}/>);
+  await user.click(screen.getByRole("button", {name: "fonte.epub"}));
+  await waitFor(() => expect(read).toHaveBeenCalledWith({name: "fonte.epub", markdown: preview.sections.map(section => section.markdown).join("\n\n")}));
+  await user.click(screen.getByRole("button", {name: "fonte_clean.epub"}));
+  await waitFor(() => expect(read).toHaveBeenLastCalledWith(expect.objectContaining({name: "fonte_clean.epub"})));
+  expect(mocks.request).toHaveBeenCalledWith("epub-imports/job-1/preview?source=original&group=1");
+  expect(mocks.request).toHaveBeenCalledWith("epub-imports/job-1/preview?source=cleaned&group=1");
+  expect(mocks.request.mock.calls.some(([, method]) => method && method !== "GET")).toBe(false);
+  expect(mocks.extracted).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});

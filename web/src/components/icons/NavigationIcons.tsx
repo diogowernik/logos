@@ -156,3 +156,16 @@ export function DeleteIcon() {
     </Icon>
   );
 }
+
+export function MoreVerticalIcon() {
+  return <Icon strokeWidth="2.5"><path d="M12 5v.01M12 12v.01M12 19v.01" /></Icon>;
+}
+export function ExtractIcon() {
+  return <Icon><path d="M3 3h12v18H3zM7 7h4M7 11h3M13 12h9m-4-4 4 4-4 4" /></Icon>;
+}
+export function CleanIcon() {
+  return <Icon><path d="m17 3-8 10M8 10l8 6-5 6-9-7zM20 3v6M17 6h6" /></Icon>;
+}
+export function RefreshIcon() {
+  return <Icon><path d="M20 7a8 8 0 1 0 1 8M20 3v5h-5" /></Icon>;
+}

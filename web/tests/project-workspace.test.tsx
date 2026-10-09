@@ -91,8 +91,7 @@ it("creates and selects an independent group without switching the book default"
     return defaults(path, method, body);
   });
   render(<LibraryShell><ProjectEditor projectId="1" /></LibraryShell>);
-  await user.click(await screen.findByLabelText("Opções do grupo"));
-  await user.click(screen.getByRole("menuitem", {name: "Novo grupo vazio"}));
+  await user.click(await screen.findByRole("button", {name: "Novo grupo vazio"}));
   const dialog = screen.getByRole("dialog");
   await user.type(within(dialog).getByLabelText(/Nome/), "Revisão humana");
   await user.click(within(dialog).getByRole("button", {name: "Salvar"}));
@@ -129,6 +128,7 @@ function defaults(path: string, method?: string, body?: { cover?: string }) {
 }
 
 beforeEach(() => {
+  localStorage.removeItem("logos.book.1.layout");
   vi.clearAllMocks();
   mocks.request.mockReset();
   current = content;
@@ -151,8 +151,8 @@ it("opens the protected project route in the center with its operations and an e
   const panel = main;
   await within(main).findByRole("heading", { name: "Livro A" });
   expect(screen.getByRole("button", { name: "Mostrar painel de trabalho" })).toHaveAttribute("aria-expanded", "false");
+  await userEvent.setup().click(screen.getByRole("button", {name: "Capa e informações"}));
   expect(within(panel).getByRole("button", { name: "Trocar capa" })).toBeEnabled();
-  await userEvent.setup().click(screen.getByRole("tab", { name: "Textos" }));
   expect(
     within(main).queryByRole("button", { name: "Buscar na biblioteca" }),
   ).not.toBeInTheDocument();
@@ -167,7 +167,7 @@ it("opens the protected project route in the center with its operations and an e
     within(panel).getByRole("link", { name: "Editar Capítulo A" }),
   ).toHaveAttribute("href", "/texts/2");
   expect(
-    within(panel).getByRole("link", { name: "+ Adicionar texto" }),
+    within(panel).getByRole("link", { name: "Adicionar texto" }),
   ).toHaveAttribute("href", "/projects/1/new?group=1");
   const user = userEvent.setup();
   within(panel).getByRole("button", { name: "Reordenar Capítulo A" }).focus();
@@ -180,7 +180,6 @@ it("opens the protected project route in the center with its operations and an e
       .getAllByRole("button", { name: /^Capítulo [AB]$/ })
       .map((link) => link.textContent),
   ).toEqual(["Capítulo B", "Capítulo A"]);
-  await user.click(screen.getByRole("tab", { name: "Geração" }));
   await user.click(within(panel).getByRole("button", { name: "Gerar EPUB" }));
   const download = await within(panel).findByRole("link", {
     name: "Baixar EPUB",
@@ -188,14 +187,13 @@ it("opens the protected project route in the center with its operations and an e
   expect(download).toHaveAttribute("href", artifact.url);
   expect(download).toHaveAttribute("download", artifact.filename);
   expect(within(panel).getByText(/^Gerado em/)).toBeVisible();
-  await user.click(screen.getByRole("tab", { name: "Arquivos" }));
+  await user.click(screen.getByRole("button", { name: "Imagens e arquivos" }));
   await user.click(
     within(panel).getByRole("button", { name: "Usar capa-b.png como capa" }),
   );
   expect(mocks.request).toHaveBeenCalledWith("projects/1", "PATCH", {
     cover: "cover-b",
   });
-  await user.click(screen.getByRole("tab", { name: "Visão geral" }));
   await waitFor(() =>
     expect(
       within(main).getByRole("img", { name: "Capa de Livro A" }),
@@ -211,7 +209,7 @@ it("keeps the central book workspace while panels collapse and opens the existin
     </LibraryShell>,
   );
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("tab", { name: "Geração" }));
+  await screen.findByRole("heading", {name: "Livro A"});
   const download = await screen.findByRole("link", { name: "Baixar EPUB" });
   await user.click(screen.getByRole("button", { name: "Mostrar painel de trabalho" }));
   await user.click(
@@ -335,74 +333,29 @@ it("opens the book centrally on mobile without automatically opening the empty r
   ).toHaveAttribute("aria-expanded", "false");
 });
 
-it("opens overview first and separates tasks and labels future tools without making requests", async () => {
-  render(
-    <LibraryShell>
-      <ProjectEditor key="1" projectId="1" />
-    </LibraryShell>,
-  );
-  const overviewTab = await screen.findByRole("tab", { name: "Visão geral" });
-  expect(overviewTab).toHaveAttribute("aria-selected", "true");
-  expect(screen.getByRole("tabpanel", { name: "Visão geral" })).toBeVisible();
+it("opens a compact panel with independent areas and labels future tools without making mutations", async () => {
+  render(<LibraryShell><ProjectEditor key="1" projectId="1" /></LibraryShell>);
+  await screen.findByRole("heading", {name: "Livro A"});
+  expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", {name: "Capa e informações"})).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByRole("button", {name: "Textos"})).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", {name: "Markdown"})).toHaveAttribute("aria-expanded", "true");
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Editar informações" }));
-  expect(screen.getByRole("dialog", { name: "Editar projeto" })).toBeVisible();
-  await user.click(screen.getByRole("button", { name: "Cancelar" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Editar projeto" })).not.toBeInTheDocument());
-  overviewTab.focus();
-  await user.keyboard("{ArrowRight}{Enter}");
-  expect(screen.getByRole("tabpanel", { name: "Textos" })).toBeVisible();
-  expect(screen.queryByRole("button", { name: "Trocar capa" })).not.toBeInTheDocument();
-  await user.click(screen.getByRole("tab", { name: "Arquivos" }));
-  const future = screen.getByRole("button", {
-    name: "Enviar arquivo (em planejamento)",
-  });
-  expect(future).toBeDisabled();
-  expect(
-    within(screen.getByRole("tabpanel", { name: "Arquivos" })).queryByRole(
-      "button",
-      { name: /EPUB|Extrair textos|Converter em projeto/ },
-    ),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("button", {
-      name: "Excluir capa-b.png (em planejamento)",
-    }),
-  ).toBeDisabled();
-  expect(
-    screen.getByRole("button", {
-      name: "Copiar endereço de capa-b.png (em planejamento)",
-    }),
-  ).toBeDisabled();
-  const before = mocks.request.mock.calls.length;
-  await expect(user.click(future)).rejects.toThrow("pointer-events: none");
-  expect(mocks.request).toHaveBeenCalledTimes(before);
-  await user.click(screen.getByRole("tab", { name: "Importação" }));
-  const importSection = screen.getByRole("region", { name: "EPUB importado" });
-  expect(within(importSection).getByText("Nenhum EPUB importado.")).toBeVisible();
-  expect(within(importSection).getByRole("button", { name: "Importar EPUB" })).toBeEnabled();
-  expect(within(importSection).queryByRole("button", { name: "Extrair do original" })).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: "Converter em projeto" }),
-  ).not.toBeInTheDocument();
-  await user.click(screen.getByRole("tab", { name: "Geração" }));
-  expect(
-    within(screen.getByRole("region", { name: "EPUB gerado" })).getByRole(
-      "button",
-      { name: "Gerar EPUB" },
-    ),
-  ).toBeEnabled();
-  expect(
-    screen.queryByRole("button", {
-      name: "Ver gerações anteriores (em planejamento)",
-    }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.queryByRole("link", { name: "Baixar EPUB" }),
-  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", {name: "Editar informações"}));
+  expect(screen.getByRole("dialog", {name: "Editar projeto"})).toBeVisible();
+  await user.click(screen.getByRole("button", {name: "Cancelar"}));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await user.click(screen.getByRole("button", {name: "Imagens e arquivos"}));
+  const files = screen.getByRole("region", {name: "Imagens e arquivos"});
+  expect(within(files).getByRole("button", {name: "Enviar arquivo (em planejamento)"})).toBeDisabled();
+  expect(within(files).getByRole("button", {name: "Excluir capa-b.png (em planejamento)"})).toBeDisabled();
+  expect(within(files).queryByRole("button", {name: /EPUB|Extrair textos/})).not.toBeInTheDocument();
+  expect(screen.getByRole("button", {name: "Importar EPUB"})).toBeEnabled();
+  expect(screen.getByRole("button", {name: "Gerar EPUB"})).toBeEnabled();
+  expect(mocks.request.mock.calls.some(([, method]) => method && method !== "GET")).toBe(false);
 });
 
-it("preserves an in-flight generation and its failure when switching tabs", async () => {
+it("preserves an in-flight generation and its failure while its area is collapsed", async () => {
   current = { ...content, epub: artifact };
   let rejectGeneration!: (error: Error) => void;
   mocks.request.mockImplementation((path: string, method?: string) => {
@@ -418,14 +371,16 @@ it("preserves an in-flight generation and its failure when switching tabs", asyn
     </LibraryShell>,
   );
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("tab", { name: "Geração" }));
+  await screen.findByRole("heading", {name: "Livro A"});
   await user.click(screen.getByRole("button", { name: "Gerar novamente" }));
   expect(screen.getByRole("button", { name: "Gerando EPUB…" })).toBeDisabled();
-  await user.click(screen.getByRole("tab", { name: "Textos" }));
+  expect(screen.getByRole("combobox", {name: "Grupo de textos"})).toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByRole("button", {name: "Novo grupo vazio"})).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Textos" }));
   await act(async () => {
     rejectGeneration(new Error("Falha ao gerar"));
   });
-  await user.click(screen.getByRole("tab", { name: "Geração" }));
+  await user.click(screen.getByRole("button", {name: "Textos"}));
   expect(screen.getByRole("alert")).toHaveTextContent("Falha ao gerar");
   expect(screen.getByRole("link", { name: "Baixar EPUB" })).toHaveAttribute(
     "href",
@@ -508,20 +463,19 @@ it("refreshes the central chapter list and files after extracting into the curre
   });
   render(<LibraryShell><ProjectEditor key="1" projectId="1" /></LibraryShell>);
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("tab", { name: "Importação" }));
+  await screen.findByRole("button", {name: "EPUBs de origem"});
   await user.click(screen.getByRole("button", { name: "Extrair do original" }));
   const dialog = await screen.findByRole("dialog", { name: "Extrair textos do original" });
   await user.click(await within(dialog).findByRole("radio", { name: "Acrescentar ao final, mantendo os textos existentes" }));
   await user.click(within(dialog).getByRole("button", { name: "Extrair textos" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  await user.click(screen.getByRole("tab", { name: "Textos" }));
-  expect(within(screen.getByRole("tabpanel", { name: "Textos" })).getByRole("link", { name: "Editar Extraído" })).toHaveAttribute("href", "/texts/44");
-  await user.click(screen.getByRole("tab", { name: "Arquivos" }));
+  expect(within(screen.getByRole("region", { name: "Textos" })).getByRole("link", { name: "Editar Extraído" })).toHaveAttribute("href", "/texts/44");
+  await user.click(screen.getByRole("button", { name: "Imagens e arquivos" }));
   expect(screen.getByRole("link", { name: "ilustracao.png" })).toBeVisible();
 });
 
 
-it("reads Texts laterally, keeps editing explicit and switches cleanly between Texts and Markdown", async () => {
+it("reads the last selected Text or Markdown laterally and keeps editing explicit", async () => {
   mocks.request.mockImplementation((path, method, body) => {
     if (path.startsWith("projects/1/markdown-files")) return Promise.resolve([{ name: "fonte.md", size: 20, sha256: "hash", status: "new" }]);
     if (path === "projects/1/markdown-preview") return Promise.resolve({ sections: [{ markdown: "# Fonte\n\nConteúdo do arquivo" }] });
@@ -529,8 +483,8 @@ it("reads Texts laterally, keeps editing explicit and switches cleanly between T
   });
   const user = userEvent.setup();
   render(<LibraryShell><ProjectEditor projectId="1" /></LibraryShell>);
-  await user.click(await screen.findByRole("tab", { name: "Textos" }));
-  const texts = screen.getByRole("tabpanel", { name: "Textos" });
+  await screen.findByRole("heading", {name: "Livro A"});
+  const texts = screen.getByRole("region", { name: "Textos" });
   const title = within(texts).getByRole("button", { name: "Capítulo A" });
   title.focus();
   await user.keyboard("{Enter}");
@@ -549,18 +503,13 @@ it("reads Texts laterally, keeps editing explicit and switches cleanly between T
   await user.click(within(texts).getByRole("button", { name: "Capítulo B" }));
   expect(await screen.findByRole("article", { name: "Leitura de Capítulo B" })).toBeVisible();
 
-  await user.click(screen.getByRole("tab", { name: "Markdown" }));
-  expect(screen.queryByRole("article")).not.toBeInTheDocument();
-  await user.click(await screen.findByRole("button", { name: "fonte.md" }));
-  expect(await screen.findByRole("article", { name: "Leitura de fonte.md" })).toHaveTextContent("Conteúdo do arquivo");
-  await user.click(screen.getByRole("tab", { name: "Textos" }));
-  expect(await screen.findByRole("article", { name: "Leitura de Capítulo B" })).toBeVisible();
-  expect(screen.queryByRole("article", { name: "Leitura de fonte.md" })).not.toBeInTheDocument();
-  await user.click(screen.getByRole("tab", { name: "Markdown" }));
-  expect(await screen.findByRole("article", { name: "Leitura de fonte.md" })).toBeVisible();
-  await user.click(screen.getByRole("tab", { name: "Visão geral" }));
-  expect(screen.queryByRole("article")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Mostrar painel de trabalho" })).toHaveAttribute("aria-expanded", "false");
+  await user.click(await screen.findByRole("button", {name: "fonte.md"}));
+  expect(await screen.findByRole("article", {name: "Leitura de fonte.md"})).toHaveTextContent("Conteúdo do arquivo");
+  expect(screen.queryByRole("article", {name: "Leitura de Capítulo B"})).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", {name: "Markdown"}));
+  expect(screen.getByRole("article", {name: "Leitura de fonte.md"})).toBeVisible();
+  await user.click(within(texts).getByRole("button", {name: "Capítulo A"}));
+  expect(await screen.findByRole("article", {name: "Leitura de Capítulo A"})).toBeVisible();
   expect(mocks.request.mock.calls.filter(([, method]) => method && method !== "GET")).toEqual([
     ["projects/1/markdown-preview", "POST", { files: ["fonte.md"], group: 1 }],
   ]);
@@ -568,9 +517,37 @@ it("reads Texts laterally, keeps editing explicit and switches cleanly between T
 
 it("closes the empty book panel while preserving the editor's previous preview preference", async () => {
   const view = render(<LibraryShell><ProjectEditor key="book" projectId="1" /></LibraryShell>);
-  await screen.findByRole("tab", { name: "Visão geral" });
+  await screen.findByRole("heading", {name: "Livro A"});
   expect(screen.getByRole("button", { name: "Mostrar painel de trabalho" })).toHaveAttribute("aria-expanded", "false");
   view.rerender(<LibraryShell><ProjectEditor key="text" projectId="1" initialView="text" initialTextId={2} /></LibraryShell>);
   await screen.findByLabelText("Conteúdo Markdown");
   expect(await screen.findByRole("article", { name: "Texto renderizado" })).toHaveTextContent("Texto A");
+});
+
+it("copies each text independently and keeps a single add action without visible numbering", async () => {
+  const user = userEvent.setup();
+  const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+  current = {...content, texts: [{...chapters[0], compiled_markdown: "## Capítulo A\n\nTexto compilado"}, chapters[1]]};
+  render(<LibraryShell><ProjectEditor projectId="1" /></LibraryShell>);
+  const texts = await screen.findByRole("region", {name: "Textos"});
+  await user.click(within(texts).getByRole("button", {name: "Copiar Capítulo A"}));
+  await waitFor(() => expect(write).toHaveBeenCalledWith("## Capítulo A\n\nTexto compilado"));
+  expect(within(texts).getAllByRole("link", {name: "Adicionar texto"})).toHaveLength(1);
+  expect(within(texts).queryByText("01")).not.toBeInTheDocument();
+  expect(within(texts).queryByText(/palavras/)).not.toBeInTheDocument();
+  expect(mocks.request).not.toHaveBeenCalledWith("groups/1/markdown");
+});
+
+it("remembers independent collapsed areas for this book and restores them after reopening", async () => {
+  const user = userEvent.setup();
+  const view = render(<LibraryShell><ProjectEditor key="first" projectId="1" /></LibraryShell>);
+  await user.click(await screen.findByRole("button", {name: "Textos"}));
+  await user.click(screen.getByRole("button", {name: "Imagens e arquivos"}));
+  expect(JSON.parse(localStorage.getItem("logos.book.1.layout")!)).toMatchObject({texts: false, files: true, markdown: true});
+  expect(localStorage.getItem("logos.book.9.layout")).toBeNull();
+  view.rerender(<LibraryShell><ProjectEditor key="reopened" projectId="1" /></LibraryShell>);
+  await waitFor(() => expect(screen.getByRole("button", {name: "Textos"})).toHaveAttribute("aria-expanded", "false"));
+  expect(screen.getByRole("button", {name: "Imagens e arquivos"})).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", {name: "Markdown"})).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("combobox", {name: "Grupo de textos"})).toBeEnabled();
 });

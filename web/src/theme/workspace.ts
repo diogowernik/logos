@@ -30,6 +30,7 @@ export const WorkspaceMain = styled(Box)(({ theme }) => ({
   minWidth: 0,
   overflowY: "auto",
   padding: theme.spacing(2.5, 3),
+  "&:has(.book-workspace)": { backgroundColor: theme.app.surfaces.reading },
   [theme.breakpoints.down("md")]: { padding: theme.spacing(2) },
 })) as typeof Box;
 export const WorkspaceDrawer = styled(Drawer, {
@@ -108,8 +109,9 @@ export const EditorWorkspace = styled(Stack, {
   shouldForwardProp: (prop) => !["editing", "bookWorkspace"].includes(String(prop)),
 })<{ editing: boolean; bookWorkspace?: boolean }>(({ editing, bookWorkspace }) => ({
   width: "100%",
-  maxWidth: bookWorkspace ? 1120 : undefined,
+  maxWidth: bookWorkspace ? 1160 : undefined,
   marginInline: bookWorkspace ? "auto" : undefined,
+  containerType: bookWorkspace ? "inline-size" : undefined,
   height: editing ? "100%" : undefined,
   minHeight: 0,
   "& > :not(.text-editor-paper)": { flexShrink: 0 },

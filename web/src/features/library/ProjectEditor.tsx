@@ -112,9 +112,28 @@ export function ProjectEditor({
   const project = data.project;
 
   const collection = collections.find((item) => item.id === project.collection);
+  const projectMenu = !project.is_inbox && (
+    <ActionMenu label="Opções do projeto">
+            {view !== "overview" && <MenuItem onClick={() => setProperties(true)}>
+              Editar projeto
+            </MenuItem>}
+            <MenuItem
+              disabled={pending}
+              onClick={() => projectAction("duplicate")}
+            >
+              Duplicar projeto
+            </MenuItem>
+            <DestructiveMenuItem
+              disabled={pending}
+              onClick={() => projectAction("delete")}
+            >
+              Excluir projeto
+            </DestructiveMenuItem>
+    </ActionMenu>
+  );
 
   return (
-    <EditorWorkspace bookWorkspace={view === "overview"} editing={view === "text"} spacing={2}>
+    <EditorWorkspace className={view === "overview" ? "book-workspace" : undefined} bookWorkspace={view === "overview"} editing={view === "text"} spacing={2}>
       <WorkspacePath>
         <WorkspaceBreadcrumbs aria-label="Caminho">
           <Link href="/">Biblioteca</Link>
@@ -133,30 +152,12 @@ export function ProjectEditor({
             <Typography aria-current="page">Leitura</Typography>
           )}
         </WorkspaceBreadcrumbs>
-        {!project.is_inbox && (
-          <ActionMenu label="Opções do projeto">
-            <MenuItem onClick={() => setProperties(true)}>
-              Editar projeto
-            </MenuItem>
-            <MenuItem
-              disabled={pending}
-              onClick={() => projectAction("duplicate")}
-            >
-              Duplicar projeto
-            </MenuItem>
-            <DestructiveMenuItem
-              disabled={pending}
-              onClick={() => projectAction("delete")}
-            >
-              Excluir projeto
-            </DestructiveMenuItem>
-          </ActionMenu>
-        )}
+        {view !== "overview" && projectMenu}
       </WorkspacePath>
       {error && !properties && !moving && (
         <Alert severity="error">{error}</Alert>
       )}
-      {view === "overview" && <ProjectOverview editor={editor} />}
+      {view === "overview" && <ProjectOverview key={project.id} editor={editor} actions={projectMenu} />}
       {view === "book" && (
         <Card component="section">
           <CardHeader

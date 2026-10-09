@@ -5,7 +5,8 @@ import { ApiError } from "@/api/client";
 import { libraryRequest, errorMessage } from "./api";
 import type { EpubImportJob, EpubSource, ExtractionPreview, ExtractionResult } from "./import-types";
 
-export function useEpubImport({ projectId, groupId, jobs, onJob, onExtracted, onBusy }: {
+export function useEpubImport({ projectId, groupId, jobs, onJob, onExtracted, onBusy, onRead }: {
+  onRead?: (document: import("./ProjectReading").ReadingDocument) => void;
   projectId: number;
   groupId: number;
   jobs: EpubImportJob[];
@@ -131,6 +132,13 @@ export function useEpubImport({ projectId, groupId, jobs, onJob, onExtracted, on
       }
     });
   }
+  async function readSource(source: EpubSource) {
+    if (!job || !onRead) return;
+    await run("Abrindo leitura…", async () => {
+      const result = await libraryRequest<ExtractionPreview>(`epub-imports/${job.id}/preview?source=${source}&group=${groupId}`);
+      if (mounted.current) onRead({ name: source === "original" ? job.original_name : job.clean_filename, markdown: result.sections.map(section => section.markdown).join("\n\n") });
+    });
+  }
   async function refreshJob() {
     if (!job) return;
     await run("Atualizando…", async () => {
@@ -140,5 +148,5 @@ export function useEpubImport({ projectId, groupId, jobs, onJob, onExtracted, on
   }
   return { target, newName, setNewName, setTarget, job, selectedId: job?.id ?? "", select, pending, error, notice, upload,
     cleanOpen, setCleanOpen, sections, setSections, reviewClean, clean,
-    previewOpen, setPreviewOpen, preview, source, stale, loadPreview, extract, refreshJob };
+    previewOpen, setPreviewOpen, preview, source, stale, loadPreview, extract, refreshJob, readSource };
 }

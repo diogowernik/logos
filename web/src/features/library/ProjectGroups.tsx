@@ -9,7 +9,9 @@ import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
-import { ProjectPanelToolbar } from "@/theme/project";
+import { BookGroupsBar, BookGroupSelect } from "@/theme/project";
+import { CopyIcon, PlusIcon } from "@/components/icons/NavigationIcons";
+import { CompactActionButton, HeaderActions } from "@/components/ui/HeaderControls";
 import { ActionMenu, DestructiveMenuItem } from "@/components/ui/ActionMenu";
 import type { useProjectEditor } from "./useProjectEditor";
 
@@ -17,7 +19,8 @@ export function ProjectGroups({editor}: {editor: ReturnType<typeof useProjectEdi
   const [action, setAction] = useState<"create" | "duplicate" | "rename" | "settings" | null>(null);
   const [output, setOutput] = useState({export_title: "", export_subtitle: "", export_author: "", cover: ""});
   const [name, setName] = useState("");
-  const {data, pending, selectGroup, groupAction} = editor;
+  const {data, selectGroup, groupAction} = editor;
+  const pending = editor.pending;
   if (!data) return null;
   function open(next: "create" | "duplicate" | "rename" | "settings") {
     setName(next === "rename" ? data!.group.name : next === "duplicate" ? `${data!.group.name} — cópia` : "");
@@ -30,19 +33,23 @@ export function ProjectGroups({editor}: {editor: ReturnType<typeof useProjectEdi
     try { await groupAction(action, name, {...output, cover: output.cover || null}); setAction(null); } catch { /* controller presents error */ }
   }
   return <>
-    <ProjectPanelToolbar>
-      <TextField select label="Grupo de textos" value={data.group.id} disabled={pending} onChange={(event) => void selectGroup(Number(event.target.value))}>
+    <BookGroupsBar>
+      <BookGroupSelect>
+      <TextField fullWidth select label="Grupo de textos" value={data.group.id} disabled={pending} onChange={(event) => void selectGroup(Number(event.target.value))}>
         {data.groups.map((group) => <MenuItem key={group.id} value={group.id}>{group.name}{group.is_default ? " · padrão" : ""}</MenuItem>)}
       </TextField>
-      <ActionMenu label="Opções do grupo">
-        <MenuItem disabled={pending} onClick={() => open("create")}>Novo grupo vazio</MenuItem>
-        <MenuItem disabled={pending} onClick={() => open("duplicate")}>Duplicar grupo</MenuItem>
+      </BookGroupSelect>
+      <HeaderActions>
+      <CompactActionButton label="Novo grupo vazio" disabled={pending} onClick={() => open("create")}><PlusIcon /></CompactActionButton>
+      <CompactActionButton label="Duplicar grupo" disabled={pending} onClick={() => open("duplicate")}><CopyIcon /></CompactActionButton>
+      <ActionMenu vertical label="Opções do grupo">
         <MenuItem disabled={pending} onClick={() => open("rename")}>Renomear grupo</MenuItem>
         <MenuItem disabled={pending} onClick={() => open("settings")}>Configurar saída</MenuItem>
         <MenuItem disabled={pending || data.group.is_default} onClick={() => { void groupAction("default").catch(() => {}); }}>Usar como padrão</MenuItem>
         <DestructiveMenuItem disabled={pending || data.group.is_default || data.groups.length < 2} onClick={() => { void groupAction("delete").catch(() => {}); }}>Excluir grupo</DestructiveMenuItem>
       </ActionMenu>
-    </ProjectPanelToolbar>
+      </HeaderActions>
+    </BookGroupsBar>
     <Dialog open={Boolean(action)} onClose={pending ? undefined : () => setAction(null)} fullWidth maxWidth="xs">
       <form onSubmit={submit}>
         <DialogTitle>{action === "create" ? "Novo grupo" : action === "duplicate" ? "Duplicar grupo" : action === "settings" ? "Saída do grupo" : "Renomear grupo"}</DialogTitle>

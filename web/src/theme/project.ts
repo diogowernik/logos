@@ -3,21 +3,10 @@ import ButtonBase from "@mui/material/ButtonBase";
 import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
 import Alert from "@mui/material/Alert";
-import Tabs from "@mui/material/Tabs";
+
 import { styled } from "@mui/material/styles";
 import { ReadingButton } from "./workspace";
 
-export const ProjectDetails = styled(Box)(({ theme }) => ({
-  display: "flex",
-  alignItems: "flex-start",
-  gap: theme.spacing(2),
-  flexWrap: "wrap",
-}));
-export const ProjectIdentity = styled(ProjectDetails)(({ theme }) => ({
-  padding: theme.spacing(2),
-  backgroundColor: theme.app.surfaces.header,
-  flexWrap: "nowrap",
-}));
 export const ProjectSummary = styled(Box)(({ theme }) => ({
   flex: 1,
   minWidth: 0,
@@ -25,37 +14,9 @@ export const ProjectSummary = styled(Box)(({ theme }) => ({
   flexDirection: "column",
   gap: theme.spacing(1),
 }));
-export const ProjectTitleGroup = styled(Box)(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  minWidth: 0,
-  gap: theme.spacing(1),
-}));
-export const ProjectTitle = styled(Typography)(({ theme }) => ({
-  fontSize: "1.125rem",
-  fontWeight: 500,
-  overflowWrap: "anywhere",
-  color: theme.app.cardTitle,
-})) as typeof Typography;
 export const ProjectFeedback = styled(Typography)(({ theme }) => ({
   fontSize: "0.875rem",
   color: theme.palette.text.secondary,
-}));
-export const ProjectTabs = styled(Tabs)(({ theme }) => ({
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.app.surfaces.header,
-  minHeight: 48,
-  "& .MuiTab-root": {
-    minHeight: 48,
-    textTransform: "none",
-    fontSize: "1rem",
-    fontWeight: 400,
-  },
-}));
-export const ProjectTabPanel = styled(Box)(({ theme }) => ({
-  padding: theme.spacing(2),
-  minWidth: 0,
-  "&[hidden]": { display: "none" },
 }));
 export const ProjectPanelToolbar = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -64,23 +25,6 @@ export const ProjectPanelToolbar = styled(Box)(({ theme }) => ({
   flexWrap: "wrap",
   gap: theme.spacing(1, 2),
   marginBottom: theme.spacing(1),
-}));
-export const ProjectPlannedTools = styled(Box)(({ theme }) => ({
-  marginTop: theme.spacing(2),
-  paddingTop: theme.spacing(2),
-  borderTop: `1px solid ${theme.palette.divider}`,
-  display: "flex",
-  flexDirection: "column",
-  gap: theme.spacing(1),
-}));
-export const ProjectEpubSections = styled(Box)(({ theme }) => ({
-  display: "flex",
-  flexDirection: "column",
-  gap: theme.spacing(2),
-  "& > section + section": {
-    borderTop: `1px solid ${theme.palette.divider}`,
-    paddingTop: theme.spacing(2),
-  },
 }));
 export const ProjectFileInfo = styled(Box)({ flex: 1, minWidth: 0 });
 export const ProjectFileName = styled(Typography)({ overflowWrap: "anywhere" });
@@ -152,3 +96,73 @@ export const ProjectFileLink = styled(Box)({
   minWidth: 0,
   overflowWrap: "anywhere",
 }) as typeof Box;
+
+
+export const BookTitle = styled(Typography)(({ theme }) => ({
+  fontSize: "1.5rem", fontWeight: 600, color: theme.palette.text.primary,
+  overflowWrap: "anywhere", lineHeight: 1.3,
+})) as typeof Typography;
+export const BookIdentity = styled(Box)(({ theme }) => ({
+  display: "flex", alignItems: "center", gap: theme.spacing(1.5), marginBottom: theme.spacing(1),
+}));
+export const BookTitleActions = styled(Box)({ marginLeft: "auto", flexShrink: 0 });
+export const BookGroupsBar = styled(Box)(({ theme }) => ({
+  display: "flex", alignItems: "center", gap: theme.spacing(1), flexWrap: "wrap",
+  paddingBlock: theme.spacing(2), borderTop: `1px solid ${theme.palette.divider}`,
+  "& > :last-child": { marginLeft: "auto" },
+}));
+export const BookGroupSelect = styled(Box)({ minWidth: 180, maxWidth: "100%" });
+export const BookGrid = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "sourcesFocused",
+})<{sourcesFocused: boolean}>(({ theme, sourcesFocused }) => ({
+  display: "grid", alignItems: "start", gap: theme.spacing(3, 4),
+  gridTemplateColumns: sourcesFocused ? "minmax(0,1fr)" : "minmax(0,1.35fr) minmax(0,1fr)",
+  "& > *": { minWidth: 0 },
+  "@container (max-width: 820px)": { gridTemplateColumns: "minmax(0,1fr)" },
+}));
+export const BookSupport = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "focused",
+})<{focused: boolean}>(({ theme, focused }) => ({
+  display: focused ? "grid" : "block", gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+  gap: theme.spacing(3,4), minWidth: 0,
+  "& > *": { minWidth: 0 }, "& > :last-child": { gridColumn: "1 / -1" },
+  "@container (max-width: 820px)": { display: "block" },
+}));
+export const BookSectionRoot = styled(Box)(({ theme }) => ({
+  borderTop: `1px solid ${theme.palette.divider}`, marginBottom: theme.spacing(3), minWidth: 0,
+})) as typeof Box;
+export const BookSectionHeader = styled(Box)(({ theme }) => ({
+  display: "flex", alignItems: "center", gap: theme.spacing(1), minHeight: 56,
+  "& > :last-child:not(:first-child)": { marginLeft: "auto" },
+}));
+export const BookSectionToggle = styled(ButtonBase)(({ theme }) => ({
+  display: "flex", alignItems: "center", gap: theme.spacing(1), textAlign: "left",
+  paddingBlock: theme.spacing(1.5), minWidth: 0,
+  "& .MuiTypography-root": { fontSize: "1rem", fontWeight: 500 },
+  "& svg": { color: theme.palette.text.secondary },
+  "& .navigation-chevron": { width: 16, height: 16, transition: "transform .15s", "&.collapsed": { transform: "rotate(-90deg)" } },
+}));
+export const BookSectionBody = styled(Box)(({ theme }) => ({paddingBottom: theme.spacing(1)}));
+export const BookExport = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(3), paddingTop: theme.spacing(2),
+  borderTop: `1px solid ${theme.palette.divider}`,
+}));
+export const BookSourceDrop = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "dragging",
+})<{dragging: boolean}>(({ theme, dragging }) => ({
+  backgroundColor: dragging ? theme.palette.action.selected : "transparent",
+  outline: dragging ? `2px dashed ${theme.palette.primary.main}` : "none",
+  borderRadius: theme.shape.borderRadius,
+}));
+export const BookSourceRow = styled(ProjectFileRow)(({ theme }) => ({
+  flexWrap: "nowrap", gap: theme.spacing(1), paddingBlock: theme.spacing(.5), minHeight: 48,
+  "& .MuiTypography-root": { fontSize: ".9375rem" },
+  "& .MuiTypography-caption": { fontSize: ".75rem" },
+  "& .MuiCheckbox-root": { padding: theme.spacing(.5) },
+  "& .MuiIconButton-root": { padding: theme.spacing(.75) },
+}));
+export const BookCleanRow = styled(BookSourceRow)(({ theme }) => ({paddingLeft: theme.spacing(2), "& > :first-child": { flex: 1, minWidth: 0 }}));
+export const BookRowActions = styled(Box)(({ theme }) => ({
+  display: "flex", alignItems: "center", gap: theme.spacing(.25), flexShrink: 0,
+  "& .MuiIconButton-root": { padding: theme.spacing(.75), color: theme.palette.text.secondary },
+}));

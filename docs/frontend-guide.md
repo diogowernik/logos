@@ -46,10 +46,11 @@ O centro mantém sua posição na árvore React ao alternar painel ou viewport,
 preservando rascunhos. Drawer temporário cuida de foco, Escape e backdrop;
 no mobile abre um painel por vez. Navegação cancelada não fecha a lateral.
 
-`ProjectOverview` organiza as tarefas do livro e preserva painéis montados ao
-alternar abas, incluindo operações pendentes. O contexto do livro começa com
+`ProjectOverview` reúne textos e geração do grupo ao lado das fontes do livro,
+com áreas recolhíveis que permanecem montadas durante operações pendentes.
+A disposição é guardada por livro no navegador; a geometria fica no tema. O contexto do livro começa com
 a direita fechada e restaura a preferência geral ao sair. `ProjectReading`
-concentra a leitura de Text ou Markdown em um único documento ativo.
+concentra a leitura de Text, Markdown ou EPUB de origem em um único documento ativo.
 
 `useProjectEditor` cuida de dados, salvamento e guard de rascunho;
 `useEpubImport`, `useMarkdownSources` e `useSourceFolder` coordenam suas consultas.

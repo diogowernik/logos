@@ -70,7 +70,7 @@ it("opens manual Markdown and offers private downloads without creating Texts", 
     render(<Harness />);
     expect(await screen.findByText("01-ato.md")).toBeVisible();
     expect(screen.getByText("Textos já gerados")).toBeVisible();
-    expect(screen.getAllByRole("link", { name: "Baixar" })[0]).toHaveAttribute("href", "/api/library/projects/1/markdown-file?name=01-ato.md");
+    expect(screen.getByRole("link", {name: "Baixar 01-ato.md"})).toHaveAttribute("href", "/api/library/projects/1/markdown-file?name=01-ato.md");
     await userEvent.setup().click(screen.getByRole("button", { name: "01-ato.md" }));
     const reading = await screen.findByRole("article", { name: "Leitura de 01-ato.md" });
     expect(within(reading).getByRole("heading", { name: "Ato 1" })).toBeVisible();
@@ -105,7 +105,7 @@ it("uploads a dropped batch and refreshes without automatically generating Texts
     render(<Harness />);
     await screen.findByText("01-ato.md");
     const incoming = [new File(["# A"], "a.md"), new File(["# B"], "b.md")];
-    fireEvent.drop(screen.getByRole("button", { name: "Arraste arquivos Markdown ou clique para enviar" }), { dataTransfer: { files: incoming } });
+    fireEvent.drop(screen.getByRole("group", {name: "Área de upload Markdown"}), { dataTransfer: { files: incoming } });
     await screen.findByText("Arquivos enviados.");
     const call = mocks.request.mock.calls.find(([path, method]) => path.includes("markdown-files") && method === "POST")!;
     expect((call[2] as FormData).getAll("files")).toEqual(incoming);
@@ -117,7 +117,7 @@ it("reviews a selected batch and requires explicit confirmation when Texts exist
     render(<Harness />);
     await screen.findByText("01-ato.md");
     await user.click(screen.getByRole("checkbox", { name: "Selecionar 01-ato.md" }));
-    expect(screen.getByRole("button", { name: "Gerar todos" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Gerar selecionados" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Gerar selecionados" }));
     expect(mocks.request).toHaveBeenCalledWith("projects/1/markdown-preview", "POST", { files: ["01-ato.md"], group: 1 });
     const dialog = await screen.findByRole("dialog", { name: "Gerar textos dos Markdown" });
@@ -134,6 +134,8 @@ it("reviews a selected batch and requires explicit confirmation when Texts exist
     await screen.findByText("Textos disponíveis no projeto.");
     expect(mocks.request).toHaveBeenCalledWith("projects/1/markdown-import", "POST", expect.objectContaining({ source_sha256: "source-hash", group_state: "project-hash", mode: "append", confirm_existing: true }));
     expect(mocks.extracted).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("checkbox", {name: "Selecionar 01-ato.md"}));
     await user.click(await screen.findByRole("button", { name: "Gerar todos" }));
     expect(mocks.request).toHaveBeenCalledWith("projects/1/markdown-preview", "POST", { files: ["01-ato.md", "02-ato.md"], group: 1 });
 });
@@ -194,7 +196,7 @@ it("rejects invalid drops and prevents escape closing an in-flight generation", 
     const user = userEvent.setup();
     render(<Harness />);
     await screen.findByText("01-ato.md");
-    fireEvent.drop(screen.getByRole("button", { name: "Arraste arquivos Markdown ou clique para enviar" }), { dataTransfer: { files: [new File(["bad"], "wrong.txt")] } });
+    fireEvent.drop(screen.getByRole("group", {name: "Área de upload Markdown"}), { dataTransfer: { files: [new File(["bad"], "wrong.txt")] } });
     await screen.findByText(/Envie até 100 arquivos/);
     let complete!: (value: unknown) => void;
     mocks.request.mockImplementation((path, method) => path.endsWith("markdown-import") ? new Promise((resolve) => { complete = resolve; }) : defaults(path, method));

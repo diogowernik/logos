@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { ComposeIcon, ImageIcon } from "@/components/icons/NavigationIcons";
 import { PrivateImage } from "@/components/PrivateImage";
 import { errorMessage, libraryRequest } from "./api";
@@ -17,13 +17,18 @@ import Typography from "@mui/material/Typography";
 export function ProjectCover({
   project,
   onChange,
+  blocked = false,
+  onBusy,
 }: {
   project: Project;
   onChange: (project: Project) => void;
+  blocked?: boolean;
+  onBusy?: (busy: boolean) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => { onBusy?.(pending); return () => onBusy?.(false); }, [pending, onBusy]);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const image = event.target.files?.[0];
@@ -53,7 +58,7 @@ export function ProjectCover({
       <ProjectCoverButton
         aria-label={project.cover_url ? "Trocar capa" : "Adicionar capa"}
         aria-busy={pending}
-        disabled={pending}
+        disabled={pending || blocked}
         onClick={() => input.current?.click()}
       >
         {project.cover_url ? (
@@ -84,7 +89,7 @@ export function ProjectCover({
         aria-label="Arquivo de capa"
         accept="image/jpeg,image/png,image/webp"
         hidden
-        disabled={pending}
+        disabled={pending || blocked}
         onChange={upload}
       />
       {error && <ProjectCoverError severity="error">{error}</ProjectCoverError>}

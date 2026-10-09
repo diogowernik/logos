@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { DeleteIcon, DownloadIcon } from "@/components/icons/NavigationIcons";
 import { errorMessage, libraryRequest } from "./api";
 import type { EpubArtifact } from "./types";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import Stack from "@mui/material/Stack";
 import {
   ProjectPanelToolbar,
@@ -80,8 +82,8 @@ export function ProjectExport({
   return (
     <Stack component="section" spacing={1} aria-label="EPUB gerado">
       <ProjectPanelToolbar>
-        <Typography component="h2" variant="body1">
-          Última geração
+        <Typography component="h3" variant="body1">
+          EPUB deste grupo
         </Typography>
         <HeaderActions>
           <Button
@@ -111,14 +113,7 @@ export function ProjectExport({
             </Typography>
           </ProjectFileInfo>
           <HeaderActions>
-            <Button
-              component="a"
-              href={artifact.url}
-              download={artifact.filename}
-              startIcon={<DownloadIcon />}
-            >
-              Baixar EPUB
-            </Button>
+            <Tooltip title="Baixar EPUB"><IconButton component="a" aria-label="Baixar EPUB" href={artifact.url} download={artifact.filename}><DownloadIcon /></IconButton></Tooltip>
             <CompactActionButton
               label="Excluir EPUB"
               disabled={pending || blocked}

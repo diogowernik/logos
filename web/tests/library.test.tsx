@@ -239,7 +239,7 @@ it("keeps the draft on failure and toggles preview without losing edits", async 
   );
 });
 
-it("keeps identity in overview and copies the ordered Markdown from the Texts tab", async () => {
+it("keeps identity accessible and copies the ordered Markdown from Texts", async () => {
   const user = userEvent.setup();
   const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
   const compilation = "## Ideia\n\nPrimeiro texto\n\n## Continuação\n\nSegundo texto\n";
@@ -255,18 +255,12 @@ it("keeps identity in overview and copies the ordered Markdown from the Texts ta
       <ProjectEditor projectId="1" />
     </LibraryShell>,
   );
-  const overview = await screen.findByRole("tabpanel", { name: "Visão geral" });
-  expect(within(overview).getByRole("heading", { name: "Meu projeto" })).toBeVisible();
-  expect(within(overview).getByRole("button", { name: "Editar informações" })).toBeVisible();
-  expect(screen.queryByRole("button", { name: "Copiar todos os textos" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Ler livro" })).not.toBeInTheDocument();
-  await user.click(screen.getByRole("tab", { name: "Textos" }));
-  expect(await screen.findByRole("heading", { name: "Sumário" })).toBeVisible();
+  await screen.findByRole("heading", {name: "Meu projeto"});
+  expect(screen.getByRole("button", {name: "Editar informações"})).toBeVisible();
+  expect(screen.queryByRole("button", {name: "Ler livro"})).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Conteúdo Markdown")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Reordenar Ideia" })).toBeVisible();
-  expect(screen.queryByRole("heading", { name: "Meu projeto" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Editar informações" })).not.toBeInTheDocument();
-  const texts = screen.getByRole("tabpanel", { name: "Textos" });
+  expect(screen.getByRole("button", {name: "Reordenar Ideia"})).toBeVisible();
+  const texts = screen.getByRole("region", {name: "Textos"});
   await user.click(within(texts).getByRole("button", { name: "Copiar todos os textos" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(compilation));
   expect(mocks.request).toHaveBeenCalledWith("groups/1/markdown");
@@ -396,7 +390,6 @@ it("reorders primary chapters with the keyboard without saving editor content", 
       <ProjectEditor projectId="1" />
     </LibraryShell>,
   );
-  await userEvent.setup().click(await screen.findByRole("tab", { name: "Textos" }));
   const handle = await screen.findByRole("button", { name: "Reordenar Ideia" });
   handle.focus();
   await userEvent.setup().keyboard("{ArrowDown}");

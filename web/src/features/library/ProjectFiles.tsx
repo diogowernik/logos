@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ImageIcon,
   CopyIcon,
@@ -13,9 +13,8 @@ import type { Asset, Project } from "./types";
 import {
   ProjectFileRow,
   ProjectFileLink,
-  ProjectPanelToolbar,
 } from "@/theme/project";
-import Stack from "@mui/material/Stack";
+import { BookSection } from "./BookSection";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import Alert from "@mui/material/Alert";
@@ -28,13 +27,21 @@ export function ProjectFiles({
   project,
   assets,
   onChange,
+  blocked = false,
+  onBusy,
+  expanded, onToggle,
 }: {
   project: Project;
   assets: Asset[];
   onChange: (project: Project) => void;
+  blocked?: boolean;
+  onBusy?: (busy: boolean) => void;
+  expanded?: boolean;
+  onToggle?: () => void;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => { onBusy?.(pending); return () => onBusy?.(false); }, [pending, onBusy]);
 
   async function chooseCover(id: string | null) {
     setPending(true);
@@ -53,16 +60,12 @@ export function ProjectFiles({
   }
 
   return (
-    <Stack component="section" spacing={1} aria-label="Arquivos do livro">
-      <ProjectPanelToolbar>
-        <Typography component="h2" variant="body1">
-          Arquivos
-        </Typography>
+    <BookSection title="Imagens e arquivos" expanded={expanded} onToggle={onToggle} actions={
         <HeaderActions>
           {project.cover && (
             <Button
               variant="text"
-              disabled={pending}
+              disabled={pending || blocked}
               onClick={() => chooseCover(null)}
             >
               Remover capa
@@ -75,7 +78,7 @@ export function ProjectFiles({
             <UploadIcon />
           </CompactActionButton>
         </HeaderActions>
-      </ProjectPanelToolbar>
+      }>
       {!assets.length && (
         <Typography color="text.secondary">Nenhum arquivo enviado.</Typography>
       )}
@@ -100,7 +103,7 @@ export function ProjectFiles({
           ) : asset.mime_type.startsWith("image/") ? (
             <CompactActionButton
               label={`Usar ${asset.original_name} como capa`}
-              disabled={pending}
+              disabled={pending || blocked}
               onClick={() => chooseCover(asset.id)}
             >
               <ImageIcon />
@@ -122,6 +125,6 @@ export function ProjectFiles({
           </HeaderActions>
         </ProjectFileRow>
       ))}
-    </Stack>
+    </BookSection>
   );
 }

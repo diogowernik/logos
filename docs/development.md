@@ -60,11 +60,11 @@ usuário. Alterações apenas de documentação exigem conferir links e diff.
 
 ## Fontes locais dos livros
 
-Confira o `family_id` no banco; não deduza pelo título nem assuma `project_id`.
+Confira o `Project.id` do livro no banco; não deduza pelo título.
 A pasta é estável mesmo ao renomear o livro:
 
 ```text
-api/media/projects/<family-id>/
+api/media/projects/<project-id>/
 ├── sources/markdown/         # 01-ato.md, 02-ato.md, …
 ├── originals/               # EPUB de origem, imutável
 ├── images/                  # assets enviados
@@ -78,6 +78,22 @@ Markdown requer geração de textos. Editar arquivos não sincroniza o banco.
 Os [contratos técnicos](technical.md) explicam limites e lifecycle dos arquivos.
 
 Banco, ambientes e media ficam fora do Git. Faça backup do banco e dos arquivos.
+
+## Reassociar fontes preservadas após recriar o banco
+
+Crie o livro na interface e confira seu ID. Copie somente as fontes para sua pasta
+com associação explícita; o comando conserva a pasta original e rejeita colisões:
+
+```bash
+./.venv/bin/python api/manage.py copy_book_sources <project-id> --from-folder /caminho/do/livro --dry-run
+./.venv/bin/python api/manage.py copy_book_sources <project-id> --from-folder /caminho/do/livro
+```
+
+A pasta de origem deve conter `originals/` e/ou `sources/markdown/`. Na interface,
+atualize as pastas; vincule o EPUB e escolha o grupo ao gerar textos. O comando
+não cria textos nem faz extração automática. Arquivos anteriores à refatoração
+estão em `api/media/archive/before-groups-*/projects/`, evitando associar arquivos
+de um livro antigo a outro que receba seu ID no banco novo.
 
 ## Produção
 

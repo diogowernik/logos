@@ -21,9 +21,9 @@ def group_state(group):
 def confirmed_mode(group, state_token, mode, confirmed):
     state, count, _ = group_state(group)
     if state != state_token:
-        raise ImportConflict("Os textos do projeto mudaram. Atualize a prévia antes de continuar.")
+        raise ImportConflict("Os textos do grupo mudaram. Atualize a prévia antes de continuar.")
     if count and (mode is None or not confirmed):
         raise ImportConflict(
-            "Este projeto já tem textos. Confirme se deseja acrescentar ou substituir."
+            "Este grupo já tem textos. Confirme se deseja acrescentar ou substituir."
         )
     return mode or "append"

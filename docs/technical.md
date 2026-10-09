@@ -52,60 +52,36 @@ reservado `diagnostic` não entra na concatenação da mensagem; a feature decid
 como oferecer seus detalhes e texto copiável. Erros por campo continuam no
 contrato de `fieldErrors`, sem misturar o relatório à validação.
 
-## Dados centrais
+## Dados e grupos
 
-- `Collection`: owner, título, descrição e posição;
-- `ProjectFamily`: owner, Collection opcional, posição e versão principal;
-- `Project`: versão da família, título, subtítulo, capa e autor opcional;
-- `Text`: project, parent opcional, título, Markdown e posição;
-- `Asset`: arquivos e imagens do Project;
-- `ImportJob`: execução e arquivos da importação;
-- `ExportArtifact`: EPUB gerado e metadata técnica;
-- `ImportExtraction` e `MarkdownImport`: recibos de geração de textos.
+`Project` é o livro estável (owner, Collection, identidade, capa e `default_group`).
+`TextGroup` contém nome, metadata/capa opcional de saída e seus Texts.
+`Text.group` e `parent` mantêm sequência e variações de um nível. `Asset` e
+`ImportJob` pertencem ao livro; `ExportArtifact`, `ImportExtraction` e
+`MarkdownImport` pertencem ao grupo. `Text.origin` conserva procedência.
 
-`Text.parent` aceita somente um nível no MVP. Um filho é variação e não entra na
-compilação completa. Mover o filho para o nível principal remove essa condição.
+Criação do livro inclui um grupo inicial. Criar/duplicar outro grupo não muda o
+padrão; duplicação copia textos/variações independentes e reutiliza assets.
+Excluir padrão exige escolher outro antes; último grupo e inbox são protegidos.
+As operações de domínio ficam em `services/projects.py`, `groups.py` e `texts.py`.
+Não existem famílias, restauração ou promoção de versões.
 
-## Versões do Project
+| Endpoint privado em `/api/library/` | Contrato |
+| --- | --- |
+| CRUD `projects/` | Livro; criação inclui grupo inicial. `default_group` é somente leitura. |
+| GET `projects/<id>/content/?group=<id>` | Livro, grupos, textos do selecionado, assets, fontes e EPUB; omitir grupo usa padrão. |
+| CRUD `groups/` | Corpo de criação `{project, name}`; PATCH permite nome, `export_title/subtitle/author` e capa do livro. |
+| POST `groups/<id>/duplicate/` | Cópia independente; nome opcional. |
+| POST `groups/<id>/default/` | Escolha explícita do padrão do livro. |
+| POST `groups/<id>/reorder/` | `ids` completos dos textos principais do grupo. |
+| GET `groups/<id>/markdown/` | Compilação ordenada do grupo. |
+| CRUD `texts/` | Criação usa `group`; `project` é identidade derivada somente leitura. |
+| POST `texts/<id>/move/` | `group` explícito ou `project` para seu padrão; variações acompanham o principal. |
 
-O backend representa uma família de Projects com exatamente uma versão
-principal. A família pertence à Collection; suas versões não aparecem como
-Projects duplicados dentro dela.
-
-Invariantes:
-
-- cada versão continua sendo um Project completo, com seus próprios Texts;
-- somente uma versão da família é principal;
-- a compilação e os EPUBs finais pertencem à versão que os produziu;
-- arquivos originais e limpos podem ser referenciados pela família inteira;
-- uma versão secundária pode ser restaurada, mantida ou excluída;
-- excluir uma versão secundária não altera a principal;
-- trocar a principal é uma operação transacional;
-- falha durante a cópia mantém a principal anterior intacta.
-
-Algoritmo de **Criar nova versão principal**:
-
-1. criar outro Project na mesma família e Collection, copiando somente os dados
-   básicos adequados do Project;
-2. não copiar Texts, variações nem EPUBs gerados;
-3. marcar o novo Project vazio como principal;
-4. rebaixar o anterior, com todo seu conteúdo, para versão secundária;
-5. concluir a troca na mesma transação lógica.
-
-O objetivo é receber novos Markdown organizados, não reproduzir o conteúdo ruim
-da versão anterior. Arquivos de origem compartilhados pela família continuam
-acessíveis sem serem duplicados.
-
-Decisão de implementação: `ProjectFamily` guarda owner, Collection, posição e
-referência à versão principal. Cada `Project` guarda seus próprios dados e
-Texts. A família não aparece como entidade na interface. Criação e troca da
-principal são transacionais; mover um Project de Collection move sua família.
-
-Textos soltos usam por enquanto um Project reservado (`is_inbox`) como detalhe
-interno, sem pasta ou nome na interface. A navegação permite texto independente
-e destino explícito posteriormente, preservando dados já existentes.
-`Text.last_used_at` registra salvamentos e aberturas para ordenar recentes;
-listagens e buscas privadas não carregam todos os corpos Markdown.
+Consultas filtram pelo owner do livro. Textos soltos usam um livro/grupo inbox
+interno, sem configuração obrigatória na interface. Busca/recentes incluem todos
+os grupos; abrir um Text resolve seu grupo. Locks ordenam livro antes de grupo
+quando ambos são necessários; edição/substituição compartilham lock do grupo.
 
 ## Compilação
 
@@ -118,17 +94,17 @@ O pacote `epub/` adapta o motor do legado: conversão de Markdown com as mesmas
 extensões e pagebreaks, preparação de capítulos e sumário, e montagem EbookLib.
 Esse motor recebe dados simples e não consulta ORM nem gerencia storage.
 
-`ExportArtifact` guarda o último EPUB de cada Project, número de geração,
+`ExportArtifact` guarda o último EPUB de cada TextGroup, número de geração,
 checksum e versão do gerador. O nome de download usa `_vN`; a sequência avança
 somente após sucesso e recomeça em 1 após excluir o EPUB. Não há histórico armazenado.
-POST gera e DELETE exclui em `/projects/<id>/epub/`, ambos privados e com lock
-do Project. Exclusão usa o mesmo lifecycle de storage após commit e preserva
+POST gera e DELETE exclui em `/groups/<id>/epub/`, ambos privados e com lock
+do livro e grupo. Exclusão usa o mesmo lifecycle de storage após commit e preserva
 textos, capa e outros assets. A geração é síncrona. O novo arquivo é montado e inspecionado antes de
 ser salvo; a troca é transacional e a exclusão do anterior ocorre após commit.
-O download é privado. Nova versão nasce sem EPUB; cópia independente também
+O download é privado. Grupo novo nasce sem EPUB; cópia independente também
 precisa gerar seu próprio EPUB.
 
-Imagens do Project referenciadas no Markdown são incorporadas por seus URLs
+Imagens do livro referenciadas no Markdown são incorporadas por seus URLs
 privados; recursos remotos não são baixados nesta rodada. Capas JPEG/PNG mantêm
 o formato, e WebP é convertido para PNG para compatibilidade EPUB. A validação
 da orientação das imagens do corpo usa Pillow: horizontal recebe classe de 300px,
@@ -170,9 +146,9 @@ chamam o mesmo motor puro de extração; nenhum precisa executar a limpeza antes
 quando a fonte escolhida é o original. O Markdown é sanitizado para conversão,
 sem alterar os bytes do EPUB de origem.
 
-`ImportJob` pertence à família e registra original, SHA-256, inspeção, última
+`ImportJob` pertence ao livro e registra original, SHA-256, inspeção, última
 cópia limpa, número de limpeza, diagnóstico e estado (`ready`, `processing`,
-`done`, `error`). Upload repetido na mesma família reutiliza o registro pela
+`done`, `error`). Upload repetido no mesmo livro reutiliza o registro pela
 impressão SHA-256. O original é imutável. Limpeza conserva ordem do spine,
 reconstrói navegação e links e preserva IDs para notas internas. Seções de capa,
 navegação e vazias ficam desmarcadas por padrão; demais classificações são
@@ -186,11 +162,11 @@ não há watchdog nesta rodada. A cópia limpa usa nome `_clean_vN` e a anterior
 
 | Endpoint privado em `/api/library/` | Contrato |
 | --- | --- |
-| GET/POST `projects/<id>/imports/` | Lista fontes da família; multipart `file` envia EPUB, 201 novo / 200 reutilizado. |
+| GET/POST `projects/<id>/imports/` | Lista fontes do livro; multipart `file` envia EPUB, 201 novo / 200 reutilizado. |
 | GET `epub-imports/` e `epub-imports/<uuid>/` | Estado, diagnósticos, URLs privadas e recibos de extração. |
 | POST `epub-imports/<uuid>/clean/` | Corpo `{}` usa seleção sugerida; `sections: [href, ...]` define seleção revisada. |
-| GET `epub-imports/<uuid>/preview/?project=<id>&source=original` | `source: original/cleaned`, Markdown por seção, avisos, contagens existentes, `source_sha256` e `project_state`. |
-| POST `epub-imports/<uuid>/extract/` | `project`, `source` e ambos os tokens da prévia; `mode: append/replace` e `confirm_existing: true` obrigatórios se já houver textos. |
+| GET `epub-imports/<uuid>/preview/?group=<id>&source=original` | `source: original/cleaned`, Markdown por seção, avisos, contagens existentes, `source_sha256` e `group_state`. |
+| POST `epub-imports/<uuid>/extract/` | Destino, `source` e ambos os tokens da prévia; `mode: append/replace` e `confirm_existing: true` obrigatórios se já houver textos. |
 | GET `epub-imports/<uuid>/original/`, `clean-file/`, `resource/?href=...&source=original` | Downloads privados e imagem raster da fonte escolhida, com `no-store` e `nosniff`; URLs da prévia incluem SHA da fonte para detectar mudança. |
 
 O valor omitido de `source` continua `cleaned`, preservando o contrato da primeira
@@ -198,19 +174,20 @@ rodada. A interface deve sempre enviar a escolha explícita e repetir a fonte
 retornada pela prévia na extração. O original pode ser extraído mesmo quando uma
 limpeza falhou. A fonte limpa exige uma cópia válida previamente gerada.
 
-O destino deve pertencer ao proprietário e à mesma família, sem ser inbox.
-`project_state` é o hash dos textos, títulos, Markdown, posições e relações;
-mudança após a prévia gera 409. Acrescentar mantém textos e inclui novas seções
-no final; substituir remove principais e variações explicitamente confirmados.
-Imagens viram Assets privados e a capa extraída só é escolhida se o Project
-ainda não tiver capa. `ImportExtraction` registra tipo de fonte, SHA, modo,
-IDs e origem das seções. A mesma fonte e SHA no mesmo Project retornam o recibo
-com 200 sem duplicar; nova extração retorna 201. Outra seleção limpa pode ser
-revisada e extraída novamente. Arquivos criados são removidos se o banco falhar.
-Trocar de fonte não reutiliza o recibo anterior, mas exige confirmação caso já
-haja textos. Gerar outra cópia limpa não invalida a prévia do original imutável.
-Locks de Project nas operações de texto impedem que salvamentos atrasados
-recriem um texto removido pela substituição.
+A prévia recebe `group` opcional; sem ele representa um novo grupo vazio. A
+aplicação exige `group` existente **ou** `new_group_name` e `operation_id` UUID.
+`services/import_targets.py` compartilha esse contrato para EPUB e Markdown.
+Criação e aplicação são atômicas; falha não deixa um grupo vazio.
+`GroupCreation` vincula o UUID à identidade da operação e ao grupo criado:
+retry recupera o resultado; operação nova explícita pode criar outro conjunto.
+
+O destino deve pertencer ao mesmo livro do job e ao owner, sem ser inbox.
+`group_state` é hash dos Texts/títulos/Markdown/posição/relações; mudança após
+prévia retorna 409. Acrescentar mantém textos; substituir remove principais e
+variações somente após confirmação. Recibos são únicos por grupo/fonte/hash e
+protegem textos revisados contra retry. Assets iguais são deduplicados por SHA
+no livro, acumulando origens; capa extraída só vira padrão se ainda não houver
+capa. Excluir grupo mantém fontes/assets. Originais nunca são alterados.
 
 Limites: 50 MB de upload, 256 MB descomprimidos, 32 MB por entrada e 5.000 entradas.
 Caminhos inválidos, entidades XML e conteúdo criptografado não suportado são
@@ -235,20 +212,20 @@ são devolvidas na resposta, sem alterar o estado da cópia limpa.
 
 ## Segurança e storage
 
-Capas usam `Asset`, vinculado à família do Project. O caminho local é
-`media/projects/<family-id>/images/<asset-uuid>.<ext>`, independente do título.
+Capas usam `Asset`, vinculado ao Project. O caminho local é
+`media/projects/<project-id>/images/<asset-uuid>.<ext>`, independente do título.
 `ebooks/` recebe exportações geradas. A preparação manual usa `originals/`
 para EPUBs de origem e `sources/markdown/` para fontes editáveis, dentro da
 mesma pasta. JPEG, PNG e WebP são aceitos até 10 MB, com validação real da imagem.
 
-Fontes manuais são descobertas somente nas duas pastas permitidas da família,
+Fontes manuais são descobertas somente nas duas pastas permitidas do livro,
 sem varredura global ou importação automática. EPUBs podem ser vinculados após
 validação/checksum ao mesmo `ImportJob` do uploader, sem mover ou duplicar bytes.
-O cadastro passa a participar do lifecycle do ImportJob; excluir a família também
+O cadastro passa a participar do lifecycle do ImportJob; excluir o livro também
 exclui esse original vinculado. Uma fonte desaparecida pode ser religada a outro
 nome com checksum igual, preservando o job. Alterações do original são recusadas;
 catálogo sinaliza ausentes/alterados. Fontes sem cadastro e Markdown não são
-apagados automaticamente ao excluir a família.
+apagados automaticamente ao excluir o livro.
 
 `services/source_files.py` restringe nomes, diretórios, tamanho e leitura a arquivos
 regulares sem links simbólicos/hardlinks. A abertura usa diretórios relativos ao
@@ -264,19 +241,19 @@ Todos os endpoints abaixo são ações owner-filtered de Project em `/api/librar
 | --- | --- |
 | GET `projects/<id>/local-epubs/` | Nome, tamanho, SHA, job e estado encontrado/cadastrado/alterado/ausente. |
 | POST `projects/<id>/link-epub/` | `{name, sha256}` vincula fonte existente; 201 novo / 200 reutilizado. |
-| GET/POST `projects/<id>/markdown-files/` | Listagem; multipart `files` repetido envia lote sem sobrescrita. |
+| GET/POST `projects/<id>/markdown-files/` | Listagem; GET aceita `group` para status de importação; multipart `files` repetido envia lote sem sobrescrita. |
 | GET `projects/<id>/markdown-file/?name=...` | Download privado como texto simples, attachment, no-store, nosniff. |
-| POST `projects/<id>/markdown-preview/` | `{files: [name, ...]}` devolve prévia, fingerprint e estado dos Texts. |
-| POST `projects/<id>/markdown-import/` | Seleção, `source_sha256`, `project_state`, `mode`, `confirm_existing`; 201 aplicação / 200 recibo já concluído. |
+| POST `projects/<id>/markdown-preview/` | `{files: [name, ...], group?: id}` devolve prévia, fingerprint e estado do destino. |
+| POST `projects/<id>/markdown-import/` | Seleção, destino existente/novo, `source_sha256`, `group_state`, `mode`, `confirm_existing`; 201 aplicação / 200 recibo já concluído. |
 
 `services/local_sources.py` concilia EPUBs com ImportJob. `markdown_sources.py`
 prepara um Text por arquivo, nomeado pelo filename sem extensão e separadores,
 ordenando numericamente os nomes e mantendo headings/conteúdo internos.
-`services/text_imports.py` compartilha hash do projeto e confirmação entre EPUB
+`services/text_imports.py` compartilha hash do grupo e confirmação entre EPUB
 e Markdown. `MarkdownImport` registra seleção+checksums+modo e
-IDs de Texts por versão. Repetir não sobrescreve revisões; lotes sobrepostos em
+IDs de Texts por grupo. Repetir não sobrescreve revisões; lotes sobrepostos em
 append reutilizam Texts já produzidos. Se um Text foi removido, pedir revisão em
-vez de recriá-lo silenciosamente. Alterações na fonte ou no projeto invalidam a
+vez de recriá-lo silenciosamente. Alterações na fonte ou no grupo invalidam a
 prévia com 409. Substituição confirmada remove principais e variações na mesma
 transação; falhas conservam o conteúdo anterior. Editar fontes pelo VS Code não
 sincroniza os Texts. Não reescrever caminhos relativos de imagens dos Markdown:
@@ -292,40 +269,12 @@ prévia renderizada e confirmação com EPUB. Consultas tardias não substituem 
 mais recentes nem callbacks de features desmontadas. UI usa erros copiáveis já
 existentes; sem Snackbar próprio.
 
-Cada versão escolhe sua capa entre os arquivos compartilhados. Trocar ou
-remover a capa conserva a imagem na lista de arquivos. Duplicar um Project
-copia seus Texts e Assets para uma nova família, mas não seus ImportJobs ou
-recibos de extração; excluir a família apaga os arquivos registrados
-após a transação. Excluir somente uma versão mantém os arquivos compartilhados.
+A capa padrão pertence ao livro; cada grupo pode escolher outra imagem do mesmo
+acervo para sua saída. Trocar/remover capa mantém o Asset. Duplicar livro copia
+seus grupos/Textos/Assets remapeando URLs, mas não ImportJobs, recibos ou EPUBs.
+Falha remove arquivos recém-copiados. Exclusão do livro remove os arquivos
+registrados após commit; fontes manuais sem cadastro não são apagadas.
 
-Arquivos são servidos por endpoint autenticado e filtrado pelo proprietário,
-através do proxy Next. O proxy preserva multipart no envio e bytes no download.
-Não há exposição pública de `MEDIA_ROOT`; imagens privadas usam a sessão do
-browser, sem otimização remota do Next.
-
-- todo conteúdo privado parte do usuário autenticado;
-- jobs e arquivos pertencem ao usuário;
-- operações longas têm estado persistido;
-- arquivos gerados guardam checksum e versão do compilador;
-- falha não substitui artefato válido;
-- exclusão material exige confirmação.
-
-Publicação externa, histórico automático de revisões, tags, subpastas,
-colaboração e integração com IA não pertencem ao MVP.
-
-## Referência do legado
-
-O legado permanece em `/Users/diogo/Development/monorepo/front/logos`,
-`monorepo/back/publications` e `monorepo/back/profiles`. Seu banco local fica
-em `monorepo/back/db.sqlite3`; não alterar ou importar automaticamente.
-
-A auditoria de 5 de outubro de 2026 encontrou publicações sem livro e referências
-sem arquivo no storage local. Isso não comprova perda em produção: banco e
-storage podem ser de momentos diferentes. Na curadoria manual, confira owner,
-ordem, checksums e presença dos arquivos; não trate órfãos como lixo automaticamente.
-O legado não tinha vínculo confiável no servidor entre job de limpeza e livro.
-
-Para a futura leitura Kindle, a rota `/kindle/[slug]/[chapterId]` serve como
-referência de recursos. Sua paginação por quantidade de caracteres podia cortar
-Markdown e parágrafos, ignorando viewport e fonte; progresso em localStorage
-não oferece sincronização. Não transportar essas limitações para o novo reader.
+`ExportArtifact.source_sha256` representa texto, metadata e assets usados.
+Publicação verifica o snapshot sob lock; mudança concorrente conserva o último
+EPUB válido e pede nova geração. `is_current` sinaliza uma saída desatualizada.

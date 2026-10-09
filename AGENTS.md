@@ -24,10 +24,12 @@ padrões visuais. Não leia nem atualize todos os documentos a cada alteração.
 ## Domínio e dados
 
 - Preserve `+ -> escrever/colar -> salvar`, sem metadata obrigatória.
-- Collection é pasta opcional; Project tem Texts principais e variações de um
-  nível. Cada família de Projects tem exatamente uma versão principal.
-- Nova versão principal copia dados básicos e nasce sem Texts, variações ou
-  EPUBs. Trocas de principal são transacionais, sem histórico de cada save.
+- Collection é pasta opcional; Project é o livro estável. TextGroup reúne textos
+  principais ordenados e variações de um nível. Fontes e imagens são do livro.
+- Criar um grupo não muda o padrão. Duplicação copia textos independentes e
+  reutiliza imagens; importação pode criar outro grupo ou alimentar um existente.
+- Excluir grupo conserva o livro/fontes; escolha outro padrão antes de excluir
+  o atual e preserve pelo menos um grupo. EPUB mantém só a última saída por grupo.
 - Copy, leitura e EPUB usam a mesma compilação ordenada dos Texts principais.
 - Importação e limpeza não devem complicar escrever do zero.
 - Migração do legado é manual e gradual; não altere o legado sem pedido.

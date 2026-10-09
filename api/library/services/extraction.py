@@ -54,7 +54,7 @@ def extract_texts(
     source=DEFAULT_SOURCE,
 ):
     if group.project_id != job.project_id or group.project.is_inbox:
-        raise ValidationError("Escolha um projeto da mesma família da fonte.")
+        raise ValidationError("Escolha um grupo do mesmo livro da fonte.")
     prepared = proposal(source_content(job, source))
     created_assets = []
     try:

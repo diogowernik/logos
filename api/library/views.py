@@ -111,8 +111,10 @@ class ProjectViewSet(ProjectSourcesMixin, viewsets.ModelViewSet):
         if project.is_inbox:
             raise ValidationError("Escolha um livro para definir a capa.")
         if request.method == "DELETE":
-            project.cover = None
-            project.save(update_fields=["cover", "updated_at"])
+            with transaction.atomic():
+                project = Project.objects.select_for_update().get(pk=project.pk)
+                project.cover = None
+                project.save(update_fields=["cover", "updated_at"])
         else:
             serializer = ImageUploadSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)

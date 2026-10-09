@@ -63,13 +63,16 @@ class Command(BaseCommand):
                 raise CommandError("O lote Markdown ultrapassa 16 MB.")
             # Check every collision before copying any file. Never overwrite sources.
             for kind, name, content in prepared:
-                with directory(project, kind, create=True) as fd:
-                    try:
-                        previous = read_at(fd, name, kind)
-                    except FileNotFoundError:
-                        continue
-                    if previous != content:
-                        raise CommandError(f"Já existe uma fonte diferente: {name}.")
+                try:
+                    with directory(project, kind, create=not options["dry_run"]) as fd:
+                        try:
+                            previous = read_at(fd, name, kind)
+                        except FileNotFoundError:
+                            continue
+                        if previous != content:
+                            raise CommandError(f"Já existe uma fonte diferente: {name}.")
+                except FileNotFoundError:
+                    continue
             if not options["dry_run"]:
                 for kind, name, content in prepared:
                     with directory(project, kind) as fd:

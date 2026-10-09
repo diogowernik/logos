@@ -24,13 +24,20 @@ def _image_resource(asset):
 def export_group_epub(group):
     if group.project.is_inbox:
         raise EpubGenerationError("Adicione o texto a um projeto antes de gerar o EPUB.")
-    snapshot = export_state(group)
-    manuscript = compile_group(group)
-    markdown = manuscript.markdown()
-    images = tuple(
-        _image_resource(asset) for asset in group.project.assets.all() if str(asset.pk) in markdown
-    )
-    cover = _image_resource(group.effective_cover) if group.effective_cover else None
+    # Freeze the compilation inputs under the same locks used by edits/imports.
+    # The expensive pure generator runs after releasing these locks.
+    with transaction.atomic():
+        Project.objects.select_for_update().get(pk=group.project_id)
+        group = TextGroup.objects.select_for_update().select_related("project").get(pk=group.pk)
+        snapshot = export_state(group)
+        manuscript = compile_group(group)
+        markdown = manuscript.markdown()
+        images = tuple(
+            _image_resource(asset)
+            for asset in group.project.assets.all()
+            if str(asset.pk) in markdown
+        )
+        cover = _image_resource(group.effective_cover) if group.effective_cover else None
     content = generate_epub(
         manuscript,
         identifier=f"logos-group-{group.pk}",

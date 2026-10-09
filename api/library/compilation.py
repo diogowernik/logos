@@ -1,6 +1,9 @@
 """Shared, ORM-independent input for copy, reader and future EPUB export."""
 
 from dataclasses import dataclass
+from functools import cached_property
+
+from .markdown_references import scope_references
 
 
 @dataclass(frozen=True)
@@ -19,6 +22,10 @@ class Manuscript:
     subtitle: str
     sections: tuple[Section, ...]
 
-    def markdown(self) -> str:
-        parts = [section.content() for section in self.sections if section.content()]
+    @cached_property
+    def _markdown(self) -> str:
+        parts = scope_references(self.sections)
         return "\n\n".join(parts).rstrip() + "\n"
+
+    def markdown(self) -> str:
+        return self._markdown

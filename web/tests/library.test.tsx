@@ -1,5 +1,5 @@
 import { render } from "./render";
-import { screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
@@ -69,7 +69,7 @@ it("creates a project with only its title and opens its overview", async () => {
   );
   await screen.findByText("Seu próximo texto começa aqui");
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "+ Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Criar projeto" }));
   await user.type(screen.getByLabelText("Título"), "Meu projeto");
   mocks.request.mockImplementation((path, method) =>
     method === "POST" ? Promise.resolve(project) : Promise.resolve([]),
@@ -80,6 +80,112 @@ it("creates a project with only its title and opens its overview", async () => {
     collection: null,
   });
   expect(mocks.router.push).toHaveBeenCalledWith("/projects/1");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+});
+
+it("searches projects and text content in a dialog and returns focus when closed", async () => {
+  mocks.request.mockImplementation((path: string) => {
+    if (path === "projects?search=ideia") return Promise.resolve([project]);
+    if (path === "texts?search=ideia")
+      return Promise.resolve([
+        { ...text, is_loose: false, project_title: project.title },
+      ]);
+    return defaults(path);
+  });
+  render(
+    <LibraryShell>
+      <Library />
+    </LibraryShell>,
+  );
+  const user = userEvent.setup();
+  const trigger = screen.getByRole("button", { name: "Buscar na biblioteca" });
+  expect(
+    screen.getByRole("button", { name: "Filtros (em planejamento)" }),
+  ).toBeDisabled();
+  await user.click(trigger);
+  const dialog = screen.getByRole("dialog", { name: "Buscar na biblioteca" });
+  const input = within(dialog).getByRole("searchbox", {
+    name: "Buscar projetos e textos",
+  });
+  await waitFor(() => expect(input).toHaveFocus());
+  await user.type(input, "ideia");
+  const projects = await within(dialog).findByRole("list", {
+    name: "Projetos encontrados",
+  });
+  const texts = within(dialog).getByRole("list", {
+    name: "Textos encontrados",
+  });
+  expect(
+    within(projects).getByRole("link", { name: "Meu projeto" }),
+  ).toHaveAttribute("href", "/projects/1");
+  expect(within(texts).getByRole("link", { name: /Ideia/ })).toHaveAttribute(
+    "href",
+    "/texts/2",
+  );
+  expect(mocks.request).toHaveBeenCalledWith("texts?search=ideia");
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(trigger).toHaveFocus();
+});
+
+it("keeps the newest search results when an earlier request finishes later", async () => {
+  let completeOld!: (value: (typeof project)[]) => void;
+  mocks.request.mockImplementation((path: string) => {
+    if (path === "projects?search=antigo")
+      return new Promise((resolve) => {
+        completeOld = resolve;
+      });
+    if (path === "texts?search=antigo") return Promise.resolve([]);
+    if (path === "projects?search=novo")
+      return Promise.resolve([{ ...project, title: "Resultado novo" }]);
+    if (path === "texts?search=novo") return Promise.resolve([]);
+    return defaults(path);
+  });
+  render(
+    <LibraryShell>
+      <Library />
+    </LibraryShell>,
+  );
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "Buscar na biblioteca" }),
+  );
+  const dialog = screen.getByRole("dialog");
+  const input = within(dialog).getByRole("searchbox");
+  await user.type(input, "antigo");
+  await waitFor(() =>
+    expect(mocks.request).toHaveBeenCalledWith("projects?search=antigo"),
+  );
+  await user.clear(input);
+  await user.type(input, "novo");
+  expect(
+    await within(dialog).findByRole("link", { name: "Resultado novo" }),
+  ).toBeVisible();
+  await act(async () => {
+    completeOld([{ ...project, title: "Resultado antigo" }]);
+  });
+  expect(
+    within(dialog).queryByText("Resultado antigo"),
+  ).not.toBeInTheDocument();
+  expect(
+    within(dialog).getByRole("link", { name: "Resultado novo" }),
+  ).toBeVisible();
+});
+
+it("opens the search dialog for the existing search entry point", async () => {
+  mocks.request.mockImplementation(defaults);
+  render(
+    <LibraryShell>
+      <Library autofocus />
+    </LibraryShell>,
+  );
+  expect(
+    await screen.findByRole("dialog", { name: "Buscar na biblioteca" }),
+  ).toBeVisible();
 });
 
 it("saves Markdown without asking for author, language or publication status", async () => {
@@ -120,9 +226,7 @@ it("keeps the draft on failure and toggles preview without losing edits", async 
   await user.click(screen.getByRole("button", { name: "Salvar" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Sem conexão");
   expect(input).toHaveValue("## Minha ideia\n\nTexto **importante**.");
-  await user.click(
-    screen.getAllByRole("button", { name: "Ocultar preview" })[1],
-  );
+  await user.click(screen.getByRole("button", { name: "Ocultar preview" }));
   expect(
     screen.queryByRole("article", { name: "Texto renderizado" }),
   ).not.toBeInTheDocument();
@@ -135,11 +239,14 @@ it("keeps the draft on failure and toggles preview without losing edits", async 
   );
 });
 
-it("opens the project overview and offers the full book reader", async () => {
+it("keeps identity in overview and copies the ordered Markdown from the Texts tab", async () => {
+  const user = userEvent.setup();
+  const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+  const compilation = "## Ideia\n\nPrimeiro texto\n\n## Continuação\n\nSegundo texto\n";
   mocks.request.mockImplementation((path: string) =>
     path.endsWith("markdown")
       ? Promise.resolve({
-          markdown: "# Meu projeto\n\n## Ideia\n\nPrimeiro texto",
+          markdown: compilation,
         })
       : defaults(path),
   );
@@ -148,12 +255,23 @@ it("opens the project overview and offers the full book reader", async () => {
       <ProjectEditor projectId="1" />
     </LibraryShell>,
   );
+  const overview = await screen.findByRole("tabpanel", { name: "Visão geral" });
+  expect(within(overview).getByRole("heading", { name: "Meu projeto" })).toBeVisible();
+  expect(within(overview).getByRole("button", { name: "Editar informações" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Copiar todos os textos" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Ler livro" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("tab", { name: "Textos" }));
   expect(await screen.findByRole("heading", { name: "Sumário" })).toBeVisible();
   expect(screen.queryByLabelText("Conteúdo Markdown")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Reordenar Ideia" })).toBeVisible();
-  const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Ler livro" }));
-  expect(mocks.router.push).toHaveBeenCalledWith("/projects/1/read");
+  expect(screen.queryByRole("heading", { name: "Meu projeto" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Editar informações" })).not.toBeInTheDocument();
+  const texts = screen.getByRole("tabpanel", { name: "Textos" });
+  await user.click(within(texts).getByRole("button", { name: "Copiar todos os textos" }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(compilation));
+  expect(mocks.request).toHaveBeenCalledWith("projects/1/markdown");
+  expect(within(texts).getByRole("status")).toHaveTextContent("Markdown copiado");
+  expect(mocks.router.push).not.toHaveBeenCalled();
 });
 
 it("reads the same compilation used for copying", async () => {
@@ -258,9 +376,11 @@ it("opens the right panel empty in the library and removes the editor preview on
   expect(
     screen.queryByRole("article", { name: "Texto renderizado" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("complementary", { name: "Preview" })).toBeVisible();
   expect(
-    screen.getByRole("button", { name: "Ocultar preview" }),
+    screen.getByRole("complementary", { name: "Painel de trabalho" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Ocultar painel de trabalho" }),
   ).toHaveAttribute("aria-expanded", "true");
 });
 
@@ -276,6 +396,7 @@ it("reorders primary chapters with the keyboard without saving editor content", 
       <ProjectEditor projectId="1" />
     </LibraryShell>,
   );
+  await userEvent.setup().click(await screen.findByRole("tab", { name: "Textos" }));
   const handle = await screen.findByRole("button", { name: "Reordenar Ideia" });
   handle.focus();
   await userEvent.setup().keyboard("{ArrowDown}");

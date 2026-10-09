@@ -8,7 +8,7 @@ class ExportArtifactSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExportArtifact
-        fields = ["filename", "url", "created_at", "sha256", "compiler_version"]
+        fields = ["filename", "generation", "url", "created_at", "sha256", "compiler_version"]
 
     def get_url(self, obj):
         return f"/api/library/projects/{obj.project_id}/epub/file"

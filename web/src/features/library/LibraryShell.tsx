@@ -97,6 +97,7 @@ export function LibraryShell({ children }: { children: ReactNode }) {
         left={<LibrarySidebar />}
         right={null}
         leftLabel="Navegação da biblioteca"
+        rightLabel="Painel de trabalho"
       >
         {state.error && (
           <Alert severity="error" sx={{ mb: 2 }}>

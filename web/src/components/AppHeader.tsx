@@ -86,7 +86,7 @@ export function AppHeader() {
         {shell.hasRight && (
           <IconButton
             color="inherit"
-            aria-label={shell.rightOpen ? "Ocultar preview" : "Mostrar preview"}
+            aria-label={`${shell.rightOpen ? "Ocultar" : "Mostrar"} ${shell.rightLabel.toLocaleLowerCase("pt-BR")}`}
             aria-expanded={shell.rightOpen}
             aria-controls="app-right-panel"
             onClick={shell.toggleRight}

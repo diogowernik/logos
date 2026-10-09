@@ -1,16 +1,17 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
 import type { Collection, Project, TextSummary } from "./types";
-import { PrivateImage } from "@/components/PrivateImage";
+import { LibraryItem } from "./LibraryItem";
+import { LibrarySearch } from "./LibrarySearch";
+import { LibraryGrid } from "@/theme/library";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardHeader from "@mui/material/CardHeader";
 import CardContent from "@mui/material/CardContent";
-import CardActionArea from "@mui/material/CardActionArea";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
@@ -24,8 +25,15 @@ import Breadcrumbs from "@mui/material/Breadcrumbs";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
-import { alpha } from "@mui/material/styles";
-import { HeaderActions } from "@/components/ui/HeaderControls";
+import {
+  HeaderActions,
+  CompactActionButton,
+} from "@/components/ui/HeaderControls";
+import {
+  SearchIcon,
+  ComposeIcon,
+  FilterIcon,
+} from "@/components/icons/NavigationIcons";
 import { DataSection } from "@/components/ui/DataSection";
 
 export function Library({
@@ -39,48 +47,28 @@ export function Library({
 }) {
   const router = useRouter();
   const { projects, collections, loading, refresh } = useLibrary();
-  const [search, setSearch] = useState("");
-  const [searchResults, setSearchResults] = useState<Project[] | null>(null);
+  const [searchOpen, setSearchOpen] = useState(autofocus);
   const [texts, setTexts] = useState<TextSummary[]>([]);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState<"project" | "collection" | null>(
     createKind,
   );
   const [pending, setPending] = useState(false);
-  const searchInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (autofocus) searchInput.current?.focus();
-  }, [autofocus]);
   useEffect(() => {
     let active = true;
-    const timer = setTimeout(
-      async () => {
-        try {
-          const query = search.trim()
-            ? `search=${encodeURIComponent(search.trim())}`
-            : "loose=1";
-          const [foundTexts, foundProjects] = await Promise.all([
-            libraryRequest<TextSummary[]>(`texts?${query}`),
-            search.trim()
-              ? libraryRequest<Project[]>(`projects?${query}`)
-              : Promise.resolve(null),
-          ]);
-          if (active) {
-            setTexts(foundTexts);
-            setSearchResults(foundProjects);
-          }
-        } catch (reason) {
-          if (active) setError(errorMessage(reason));
-        }
-      },
-      search.trim() ? 250 : 0,
-    );
+    async function loadLooseTexts() {
+      try {
+        const found = await libraryRequest<TextSummary[]>("texts?loose=1");
+        if (active) setTexts(found);
+      } catch (reason) {
+        if (active) setError(errorMessage(reason));
+      }
+    }
+    void loadLooseTexts();
     return () => {
       active = false;
-      clearTimeout(timer);
     };
-  }, [search, projects]);
+  }, [projects]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -103,6 +91,7 @@ export function Library({
           collection: collectionId,
         });
         await refresh();
+        setCreating(null);
         router.push(`/projects/${project.id}`);
       }
     } catch (reason) {
@@ -112,7 +101,7 @@ export function Library({
     }
   }
 
-  const visible = (search.trim() ? (searchResults ?? []) : projects).filter(
+  const visible = projects.filter(
     (project) => collectionId === null || project.collection === collectionId,
   );
   const visibleTexts =
@@ -128,6 +117,7 @@ export function Library({
   const selectedCollection = collections.find(
     (collection) => collection.id === collectionId,
   );
+  const visibleCollections = collectionId === null ? collections : [];
 
   function closeCreate() {
     if (!pending) {
@@ -151,26 +141,21 @@ export function Library({
           subheader={selectedCollection?.description}
           action={
             <HeaderActions>
-              <TextField
-                inputRef={searchInput}
-                slotProps={{
-                  htmlInput: { "aria-label": "Buscar projetos e textos" },
-                }}
-                placeholder="Buscar projetos e textos…"
-                type="search"
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setSearchResults(null);
-                }}
-                sx={{ width: { xs: 200, sm: 300 }, maxWidth: "100%" }}
-              />
-              <Button
-                variant="contained"
+              <CompactActionButton
+                label="Buscar na biblioteca"
+                onClick={() => setSearchOpen(true)}
+              >
+                <SearchIcon />
+              </CompactActionButton>
+              <CompactActionButton
+                label="Criar projeto"
                 onClick={() => setCreating("project")}
               >
-                + Projeto
-              </Button>
+                <ComposeIcon />
+              </CompactActionButton>
+              <CompactActionButton label="Filtros (em planejamento)" disabled>
+                <FilterIcon />
+              </CompactActionButton>
             </HeaderActions>
           }
         />
@@ -181,131 +166,33 @@ export function Library({
             </Alert>
           )}
           <Stack spacing={2}>
-            {!search.trim() &&
-              collectionId === null &&
-              collections.length > 0 && (
-                <DataSection title="Coleções">
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fill, minmax(min(100%, 230px), 1fr))",
-                      gap: 2,
-                    }}
-                  >
-                    {collections.map((collection) => (
-                      <Card key={collection.id}>
-                        <CardActionArea
-                          component={Link}
-                          href={`/?collection=${collection.id}`}
-                        >
-                          <CardHeader
-                            title={collection.title}
-                            slotProps={{
-                              title: { component: "h3", variant: "h6" },
-                            }}
-                          />
-                          <CardContent>
-                            <Typography color="text.secondary">
-                              {
-                                projects.filter(
-                                  (project) =>
-                                    project.collection === collection.id,
-                                ).length
-                              }{" "}
-                              projetos
-                            </Typography>
-                          </CardContent>
-                        </CardActionArea>
-                      </Card>
-                    ))}
-                  </Box>
-                </DataSection>
-              )}
             {loading ? (
               <Typography color="text.secondary">
                 Carregando biblioteca…
               </Typography>
             ) : (
               <>
-                {visible.length > 0 && (
-                  <DataSection title="Projetos">
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fill, minmax(min(100%, 230px), 1fr))",
-                        gap: 2,
-                      }}
-                    >
-                      {visible.map((project) => (
-                        <Card key={project.id} sx={{ minWidth: 0 }}>
-                          <CardActionArea
-                            component={Link}
-                            href={`/projects/${project.id}`}
-                            sx={{
-                              height: "100%",
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "stretch",
-                              justifyContent: "flex-start",
-                            }}
-                          >
-                            <CardHeader
-                              title={project.title}
-                              slotProps={{
-                                title: { component: "h3", variant: "h6" },
-                              }}
-                              sx={{ width: "100%" }}
-                            />
-                            <Box
-                              aria-hidden="true"
-                              sx={(theme) => ({
-                                height: 150,
-                                display: "grid",
-                                placeItems: "center",
-                                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                fontSize: 44,
-                                color: "primary.main",
-                                "& img": {
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "contain",
-                                },
-                              })}
-                            >
-                              {project.cover_url ? (
-                                <PrivateImage src={project.cover_url} alt="" />
-                              ) : (
-                                "¶"
-                              )}
-                            </Box>
-                            <CardContent sx={{ width: "100%" }}>
-                              {project.subtitle && (
-                                <Typography>{project.subtitle}</Typography>
-                              )}
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {project.text_count}{" "}
-                                {project.text_count === 1 ? "texto" : "textos"}
-                                {project.collection &&
-                                  ` · ${collections.find((collection) => collection.id === project.collection)?.title ?? ""}`}
-                              </Typography>
-                            </CardContent>
-                          </CardActionArea>
-                        </Card>
-                      ))}
-                    </Box>
-                  </DataSection>
+                {(visible.length > 0 || visibleCollections.length > 0) && (
+                  <LibraryGrid>
+                    {visibleCollections.map((collection) => (
+                      <LibraryItem
+                        key={`collection-${collection.id}`}
+                        href={`/?collection=${collection.id}`}
+                        title={collection.title}
+                      />
+                    ))}
+                    {visible.map((project) => (
+                      <LibraryItem
+                        key={`project-${project.id}`}
+                        href={`/projects/${project.id}`}
+                        title={project.title}
+                        coverUrl={project.cover_url}
+                      />
+                    ))}
+                  </LibraryGrid>
                 )}
                 {visibleTexts.length > 0 && (
-                  <DataSection
-                    title={
-                      search.trim() ? "Textos encontrados" : "Textos soltos"
-                    }
-                  >
+                  <DataSection title="Textos soltos">
                     <List disablePadding>
                       {visibleTexts.map((text) => (
                         <ListItemButton
@@ -324,20 +211,19 @@ export function Library({
                     </List>
                   </DataSection>
                 )}
-                {!visible.length && !visibleTexts.length && (
-                  <Box sx={{ py: 5, textAlign: "center" }}>
-                    <Typography
-                      aria-hidden="true"
-                      sx={{ fontSize: 40, color: "text.secondary" }}
-                    >
-                      ¶
-                    </Typography>
-                    <Typography component="h2" variant="h6">
-                      {search
-                        ? "Nenhum resultado encontrado"
-                        : "Seu próximo texto começa aqui"}
-                    </Typography>
-                    {!search && (
+                {!visible.length &&
+                  !visibleCollections.length &&
+                  !visibleTexts.length && (
+                    <Box sx={{ py: 5, textAlign: "center" }}>
+                      <Typography
+                        aria-hidden="true"
+                        sx={{ fontSize: 40, color: "text.secondary" }}
+                      >
+                        ¶
+                      </Typography>
+                      <Typography component="h2" variant="h6">
+                        Seu próximo texto começa aqui
+                      </Typography>
                       <>
                         <Typography color="text.secondary" sx={{ my: 2 }}>
                           Comece um texto ou crie um projeto para reunir seus
@@ -352,14 +238,18 @@ export function Library({
                           </Button>
                         </HeaderActions>
                       </>
-                    )}
-                  </Box>
-                )}
+                    </Box>
+                  )}
               </>
             )}
           </Stack>
         </CardContent>
       </Card>
+      <LibrarySearch
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        collectionId={collectionId}
+      />
       <Dialog
         open={Boolean(creating)}
         onClose={closeCreate}

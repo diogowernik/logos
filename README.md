@@ -1,35 +1,14 @@
 # Logos
 
-Biblioteca-oficina pessoal para guardar, escrever, organizar e consumir textos
-em Markdown.
+Biblioteca e oficina pessoal para escrever, revisar e organizar Markdown.
+Base Django/DRF + Next.js, com MUI e Geist.
 
-```text
-Collection (opcional, como uma pasta)
-└── Project
-    └── Text
-        └── Text variation (opcional)
-```
+Collections agrupam Projects; cada Project reúne textos ordenados e variações.
+O app oferece edição com prévia, capas privadas, fontes Markdown individuais ou
+em lote, importação/limpeza de EPUB e extração para o projeto atual. Copy,
+leitura e geração de EPUB compartilham a compilação dos textos principais.
 
-O mesmo Project pode ser copiado como Markdown, lido no app ou gerado como
-EPUB. Um EPUB externo também pode ser inspecionado, limpo e convertido em
-Project.
+O fluxo básico permanece `+ -> escrever/colar -> salvar`.
 
-O caminho principal deve permanecer:
-
-```text
-+ -> escrever ou colar -> salvar
-```
-
-Veja a [documentação](docs/README.md).
-
-## Estado
-
-A primeira biblioteca e o editor Markdown estão implementados sobre a fundação
-Django/Next do App Creator. Reader, arquivos EPUB e upload de imagens vêm nas
-próximas rodadas. Veja [como executar](docs/development.md).
-
-O legado permanece intacto em:
-
-- frontend: `/Users/diogo/Development/monorepo/front/logos`;
-- backend: `/Users/diogo/Development/monorepo/back/publications`;
-- identidades: `/Users/diogo/Development/monorepo/back/profiles`.
+Veja [como executar](docs/development.md), a [documentação](docs/README.md) e as
+[pendências](docs/roadmap.md). Banco, ambientes e livros locais não entram no Git.

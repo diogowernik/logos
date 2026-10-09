@@ -10,6 +10,7 @@ import {
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
 import type { Project, ProjectContent, Text, EpubArtifact } from "./types";
+import type { EpubImportJob } from "./import-types";
 export type ProjectEditorOptions = {
   projectId: string;
   initialView?: "overview" | "text" | "new" | "book";
@@ -40,6 +41,7 @@ export function useProjectEditor({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
+  const [importPending, setImportPending] = useState(false);
   const [properties, setProperties] = useState(false);
   const [moving, setMoving] = useState(false);
   const drag = useRef<number | null>(null);
@@ -56,7 +58,7 @@ export function useProjectEditor({
   }
   function canLeave() {
     return (
-      !pending &&
+      !pending && !importPending &&
       (!dirty ||
         window.confirm("Há alterações não salvas. Descartar essas alterações?"))
     );
@@ -130,7 +132,7 @@ export function useProjectEditor({
   }, [projectId]);
 
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !importPending) return;
     function warn(event: BeforeUnloadEvent) {
       event.preventDefault();
       event.returnValue = "";
@@ -142,7 +144,7 @@ export function useProjectEditor({
       if (
         link &&
         new URL(link.href).pathname !== window.location.pathname &&
-        !window.confirm("Há alterações não salvas. Descartar essas alterações?")
+        (importPending || !window.confirm("Há alterações não salvas. Descartar essas alterações?"))
       ) {
         event.preventDefault();
         event.stopPropagation();
@@ -154,7 +156,7 @@ export function useProjectEditor({
       window.removeEventListener("beforeunload", warn);
       document.removeEventListener("click", guardLink, true);
     };
-  }, [dirty]);
+  }, [dirty, importPending]);
 
   async function refresh(id: number | null) {
     const content = await libraryRequest<ProjectContent>(
@@ -418,12 +420,7 @@ export function useProjectEditor({
     }
   }
 
-  function readBook() {
-    if (!canLeave()) return;
-    router.push(`/projects/${projectId}/read`);
-  }
-
-  async function copyBook() {
+  async function copyTexts() {
     try {
       await copy(
         (
@@ -460,8 +457,15 @@ export function useProjectEditor({
       setPending(false);
     }
   }
-  function updateEpub(epub: EpubArtifact) {
+  function updateEpub(epub: EpubArtifact | null) {
     setData((current) => current && { ...current, epub });
+  }
+  function updateImport(job: EpubImportJob) {
+    setData((current) => current && { ...current, imports: [job, ...(current.imports ?? []).filter((item) => item.id !== job.id)] });
+  }
+  async function refreshAfterImport() {
+    await refresh(null);
+    await refreshLibrary();
   }
   return {
     data,
@@ -474,7 +478,7 @@ export function useProjectEditor({
     book,
     error,
     notice,
-    pending,
+    pending: pending || importPending,
     properties,
     setProperties,
     moving,
@@ -482,8 +486,7 @@ export function useProjectEditor({
     dirty,
     projects,
     collections,
-    readBook,
-    copyBook,
+    copyTexts,
     updateCover,
     save,
     copy,
@@ -497,5 +500,8 @@ export function useProjectEditor({
     keyboardOrder,
     restoreProject,
     updateEpub,
+    updateImport,
+    refreshAfterImport,
+    setImportPending,
   };
 }

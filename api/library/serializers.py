@@ -1,8 +1,10 @@
+from django.db import transaction
 from rest_framework import serializers
 
-from .models import Asset, Collection, Project, Text
 from .compilation import Section
+from .models import Asset, Collection, Project, Text
 from .services import create_project, next_position
+from .services.texts import locked_text
 
 
 class CollectionSerializer(serializers.ModelSerializer):
@@ -16,7 +18,16 @@ class TextSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Text
-        fields = ["id", "project", "parent", "title", "markdown", "position", "last_used_at", "compiled_markdown"]
+        fields = [
+            "id",
+            "project",
+            "parent",
+            "title",
+            "markdown",
+            "position",
+            "last_used_at",
+            "compiled_markdown",
+        ]
         read_only_fields = ["position", "last_used_at"]
 
     def get_compiled_markdown(self, obj):
@@ -43,11 +54,18 @@ class TextSerializer(serializers.ModelSerializer):
             )
         return data
 
+    @transaction.atomic
     def create(self, validated_data):
         project = validated_data["project"]
+        Project.objects.select_for_update().get(pk=project.pk)
+        self.validate(validated_data)
         return Text.objects.create(**validated_data, position=next_position(project.texts.all()))
 
+    @transaction.atomic
     def update(self, instance, validated_data):
+        instance = locked_text(instance)
+        self.instance = instance
+        self.validate(validated_data)
         if instance.parent_id and "parent" in validated_data and validated_data["parent"] is None:
             validated_data["position"] = next_position(instance.project.texts.filter(parent=None))
         return super().update(instance, validated_data)
@@ -59,7 +77,16 @@ class TextListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Text
-        fields = ["id", "project", "parent", "title", "position", "last_used_at", "project_title", "is_loose"]
+        fields = [
+            "id",
+            "project",
+            "parent",
+            "title",
+            "position",
+            "last_used_at",
+            "project_title",
+            "is_loose",
+        ]
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -70,7 +97,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     is_principal = serializers.SerializerMethodField()
     is_inbox = serializers.BooleanField(source="family.is_inbox", read_only=True)
     text_count = serializers.SerializerMethodField()
-    cover = serializers.PrimaryKeyRelatedField(queryset=Asset.objects.all(), allow_null=True, required=False)
+    cover = serializers.PrimaryKeyRelatedField(
+        queryset=Asset.objects.all(), allow_null=True, required=False
+    )
     cover_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -104,6 +133,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         if asset and (not self.instance or asset.family_id != self.instance.family_id):
             raise serializers.ValidationError("Escolha uma imagem deste projeto.")
         return asset
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["collection"] = instance.family.collection_id

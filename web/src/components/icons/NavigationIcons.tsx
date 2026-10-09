@@ -72,6 +72,31 @@ export function PlusIcon() {
   );
 }
 
+export function SearchIcon() {
+  return (
+    <Icon>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m16 16 5 5" />
+    </Icon>
+  );
+}
+
+export function FilterIcon() {
+  return (
+    <Icon>
+      <path d="M4 4h16l-6 7v7l-4 2V11L4 4Z" />
+    </Icon>
+  );
+}
+
+export function CloseIcon() {
+  return (
+    <Icon>
+      <path d="m6 6 12 12M18 6 6 18" />
+    </Icon>
+  );
+}
+
 export function MoreIcon() {
   return (
     <Icon strokeWidth="2.5">
@@ -112,6 +137,22 @@ export function DownloadIcon() {
   return (
     <Icon>
       <path d="M12 3v12m-5-5 5 5 5-5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </Icon>
+  );
+}
+
+export function UploadIcon() {
+  return (
+    <Icon>
+      <path d="M12 16V3m-5 5 5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </Icon>
+  );
+}
+
+export function DeleteIcon() {
+  return (
+    <Icon>
+      <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
     </Icon>
   );
 }

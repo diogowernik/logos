@@ -2,7 +2,8 @@
 
 import markdown
 
-EXTENSIONS = ["extra", "sane_lists", "attr_list", "footnotes"]
+from ..markdown_references import EXTENSIONS
+
 PAGEBREAK_MARKERS = {r"\pagebreak", "---PAGEBREAK---", "[[pagebreak]]"}
 
 

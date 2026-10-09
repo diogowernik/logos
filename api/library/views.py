@@ -9,13 +9,13 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from .models import Collection, ExportArtifact, Project, ProjectFamily, Text
 from .asset_serializers import AssetSerializer, ImageUploadSerializer
-from .services.assets import upload_cover
 from .epub import EpubGenerationError
 from .export_serializers import ExportArtifactSerializer
-from .services.exports import export_project_epub
-from .serializers import CollectionSerializer, ProjectSerializer, TextSerializer, TextListSerializer
+from .import_errors import import_operation
+from .import_serializers import EpubUploadSerializer, ImportJobSerializer
+from .models import Collection, ExportArtifact, Project, ProjectFamily, Text
+from .serializers import CollectionSerializer, ProjectSerializer, TextListSerializer, TextSerializer
 from .services import (
     compile_project,
     create_project,
@@ -25,6 +25,11 @@ from .services import (
     reorder_texts,
     restore_version,
 )
+from .services.assets import upload_cover
+from .services.exports import delete_project_epub, export_project_epub
+from .services.imports import upload_epub
+from .services.texts import locked_text
+from .source_views import ProjectSourcesMixin
 
 
 class CollectionViewSet(viewsets.ModelViewSet):
@@ -37,7 +42,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         serializer.save(owner=self.request.user)
 
 
-class ProjectViewSet(viewsets.ModelViewSet):
+class ProjectViewSet(ProjectSourcesMixin, viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
 
     def get_queryset(self):
@@ -85,6 +90,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 ).data,
                 "assets": AssetSerializer(project.family.assets.all(), many=True).data,
                 "epub": ExportArtifactSerializer(artifact).data if artifact else None,
+                "imports": ImportJobSerializer(
+                    project.family.imports.prefetch_related("extractions"), many=True
+                ).data,
             }
         )
 
@@ -92,9 +100,27 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def markdown(self, request, pk=None):
         return Response({"markdown": compile_project(self.get_object()).markdown()})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["get", "post"], parser_classes=[MultiPartParser, FormParser])
+    def imports(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "GET":
+            return Response(
+                ImportJobSerializer(
+                    project.family.imports.prefetch_related("extractions"), many=True
+                ).data
+            )
+        serializer = EpubUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with import_operation("upload", "original"):
+            job, created = upload_epub(project, serializer.validated_data["file"])
+        return Response(ImportJobSerializer(job).data, status=201 if created else 200)
+
+    @action(detail=True, methods=["post", "delete"])
     def epub(self, request, pk=None):
         project = self.get_object()
+        if request.method == "DELETE":
+            delete_project_epub(project)
+            return Response(status=204)
         try:
             artifact = export_project_epub(project)
         except EpubGenerationError as error:
@@ -108,13 +134,21 @@ class ProjectViewSet(viewsets.ModelViewSet):
             file = artifact.file.open("rb")
         except FileNotFoundError as error:
             raise Http404("EPUB não encontrado. Gere o arquivo novamente.") from error
-        response = FileResponse(file, content_type="application/epub+zip",
-                                as_attachment=True, filename=artifact.filename)
+        response = FileResponse(
+            file,
+            content_type="application/epub+zip",
+            as_attachment=True,
+            filename=artifact.filename,
+        )
         response["Cache-Control"] = "private, no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response
 
-    @action(detail=True, methods=["post", "delete"], parser_classes=[MultiPartParser, FormParser, JSONParser])
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        parser_classes=[MultiPartParser, FormParser, JSONParser],
+    )
     def cover(self, request, pk=None):
         project = self.get_object()
         if project.family.is_inbox:
@@ -153,6 +187,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
 class TextViewSet(viewsets.ModelViewSet):
     serializer_class = TextSerializer
 
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        locked_text(instance).delete()
+
     def get_serializer_class(self):
         return TextListSerializer if self.action in ("list", "recent") else TextSerializer
 
@@ -166,7 +204,9 @@ class TextViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(project__family__is_inbox=True)
             search = self.request.query_params.get("search", "").strip()
             if search:
-                queryset = queryset.filter(Q(title__icontains=search) | Q(markdown__icontains=search))
+                queryset = queryset.filter(
+                    Q(title__icontains=search) | Q(markdown__icontains=search)
+                )
             queryset = queryset.order_by("-last_used_at", "-id").defer("markdown")
         return queryset
 
@@ -175,15 +215,17 @@ class TextViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(self.get_queryset()[:12], many=True).data)
 
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def open(self, request, pk=None):
-        text = self.get_object()
+        text = locked_text(self.get_object())
         text.last_used_at = timezone.now()
         text.save(update_fields=["last_used_at"])
         return Response(self.get_serializer(text).data)
 
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def duplicate(self, request, pk=None):
-        text = self.get_object()
+        text = locked_text(self.get_object())
         copy = Text.objects.create(
             project=text.project,
             parent=text.parent or text,
@@ -199,5 +241,5 @@ class TextViewSet(viewsets.ModelViewSet):
             Project, pk=request.data.get("project"), family__owner=request.user
         )
         text = self.get_object()
-        move_text(text, project)
+        text = move_text(text, project)
         return Response(self.get_serializer(text).data)

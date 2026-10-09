@@ -16,6 +16,7 @@ import {
   PanelCloseButton,
   PreviewPanel,
 } from "@/theme/workspace";
+type RightContext = { key: string; defaultOpen: boolean };
 type ShellState = {
   leftOpen: boolean;
   rightOpen: boolean;
@@ -23,8 +24,10 @@ type ShellState = {
   toggleRight: () => void;
   setRightOpen: (open: boolean) => void;
   rightHost: HTMLDivElement | null;
+  setRightContext: (context: RightContext | null) => void;
   hasLeft: boolean;
   hasRight: boolean;
+  rightLabel: string;
 };
 const ShellContext = createContext<ShellState | null>(null);
 export function useShell() {
@@ -51,31 +54,38 @@ export function AppShell({
   const rightDocked = useMediaQuery("(min-width: 1100px)");
   const wide = useMediaQuery("(min-width: 1280px)");
   const [leftOverride, setLeft] = useState<boolean | null>(null);
-  const [rightOverride, setRight] = useState<boolean | null>(null);
+  const [rightOverrides, setRightOverrides] = useState<Record<string, boolean>>({});
+  const [rightContext, setRightContext] = useState<RightContext | null>(null);
+  const rightKey = rightContext?.key ?? "default";
   const [rightHost, setHost] = useState<HTMLDivElement | null>(null);
-  const rightOpen = right !== undefined && (rightOverride ?? wide);
+  const rightOpen = right !== undefined && (rightOverrides[rightKey] ?? rightContext?.defaultOpen ?? wide);
   const leftOpen =
     Boolean(left) && (leftOverride ?? desktop) && (desktop || !rightOpen);
   const attachHost = useCallback(
     (node: HTMLDivElement | null) => setHost(node),
     [],
   );
-  function setRightOpen(open: boolean) {
-    setRight(open);
-    if (!desktop && open) setLeft(false);
-  }
+  const setRightOpen = useCallback(
+    (open: boolean) => {
+      setRightOverrides((current) => ({ ...current, [rightKey]: open }));
+      if (!desktop && open) setLeft(false);
+    },
+    [desktop, rightKey],
+  );
   const state = {
     leftOpen,
     rightOpen,
     toggleLeft: () => {
       setLeft(!leftOpen);
-      if (!desktop && !leftOpen) setRight(false);
+      if (!desktop && !leftOpen) setRightOpen(false);
     },
     toggleRight: () => setRightOpen(!rightOpen),
     setRightOpen,
     rightHost,
+    setRightContext,
     hasLeft: Boolean(left),
     hasRight: right !== undefined,
+    rightLabel,
   };
   function panel(
     side: "left" | "right",
@@ -92,7 +102,7 @@ export function AppShell({
         variant={docked ? "permanent" : "temporary"}
         anchor={side}
         open={open}
-        onClose={() => (side === "left" ? setLeft(false) : setRight(false))}
+        onClose={() => (side === "left" ? setLeft(false) : setRightOpen(false))}
         slotProps={{
           root: { keepMounted: true },
           paper: {
@@ -105,9 +115,12 @@ export function AppShell({
         {!docked && (
           <PanelCloseButton
             variant="text"
-            onClick={() => (side === "left" ? setLeft(false) : setRight(false))}
+            onClick={() => (side === "left" ? setLeft(false) : setRightOpen(false))}
           >
-            Fechar {side === "left" ? "navegação" : "preview"}
+            Fechar{" "}
+            {side === "left"
+              ? "navegação"
+              : rightLabel.toLocaleLowerCase("pt-BR")}
           </PanelCloseButton>
         )}
         {side === "left" ? (

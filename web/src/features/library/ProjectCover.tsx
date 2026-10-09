@@ -5,10 +5,14 @@ import { ComposeIcon, ImageIcon } from "@/components/icons/NavigationIcons";
 import { PrivateImage } from "@/components/PrivateImage";
 import { errorMessage, libraryRequest } from "./api";
 import type { Project } from "./types";
-import Box from "@mui/material/Box";
-import ButtonBase from "@mui/material/ButtonBase";
+import {
+  ProjectCoverRoot,
+  ProjectCoverButton,
+  ProjectCoverChange,
+  ProjectCoverPlaceholder,
+  ProjectCoverError,
+} from "@/theme/project";
 import Typography from "@mui/material/Typography";
-import Alert from "@mui/material/Alert";
 
 export function ProjectCover({
   project,
@@ -45,26 +49,12 @@ export function ProjectCover({
   }
 
   return (
-    <Box sx={{ width: 140, flexShrink: 0 }}>
-      <ButtonBase
+    <ProjectCoverRoot>
+      <ProjectCoverButton
         aria-label={project.cover_url ? "Trocar capa" : "Adicionar capa"}
         aria-busy={pending}
         disabled={pending}
         onClick={() => input.current?.click()}
-        sx={{
-          width: "100%",
-          aspectRatio: "3 / 4",
-          position: "relative",
-          bgcolor: "action.hover",
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
-          overflow: "hidden",
-          "& img": { width: "100%", height: "100%", objectFit: "contain" },
-          "&:hover .cover-change, &:focus-visible .cover-change": {
-            opacity: 1,
-          },
-        }}
       >
         {project.cover_url ? (
           <>
@@ -72,43 +62,22 @@ export function ProjectCover({
               src={project.cover_url}
               alt={`Capa de ${project.title}`}
             />
-            <Box
-              className="cover-change"
-              sx={{
-                position: "absolute",
-                bottom: 0,
-                insetInline: 0,
-                bgcolor: "background.paper",
-                p: 1,
-                opacity: 0,
-                display: "flex",
-                gap: 1,
-                alignItems: "center",
-              }}
-            >
+            <ProjectCoverChange className="cover-change">
               <ComposeIcon />
               <Typography variant="caption">
                 {pending ? "Enviando…" : "Trocar capa"}
               </Typography>
-            </Box>
+            </ProjectCoverChange>
           </>
         ) : (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 1,
-              color: "text.secondary",
-            }}
-          >
+          <ProjectCoverPlaceholder>
             <ImageIcon />
             <Typography variant="caption">
               {pending ? "Enviando…" : "Adicionar capa"}
             </Typography>
-          </Box>
+          </ProjectCoverPlaceholder>
         )}
-      </ButtonBase>
+      </ProjectCoverButton>
       <input
         ref={input}
         type="file"
@@ -118,11 +87,7 @@ export function ProjectCover({
         disabled={pending}
         onChange={upload}
       />
-      {error && (
-        <Alert severity="error" sx={{ mt: 1 }}>
-          {error}
-        </Alert>
-      )}
-    </Box>
+      {error && <ProjectCoverError severity="error">{error}</ProjectCoverError>}
+    </ProjectCoverRoot>
   );
 }

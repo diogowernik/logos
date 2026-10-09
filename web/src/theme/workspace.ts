@@ -1,5 +1,6 @@
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import ButtonBase from "@mui/material/ButtonBase";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import CardHeader from "@mui/material/CardHeader";
 import CardActions from "@mui/material/CardActions";
@@ -104,8 +105,11 @@ export const EditorPaper = styled(Paper)(({ theme }) => ({
   minHeight: 0,
 })) as typeof Paper;
 export const EditorWorkspace = styled(Stack, {
-  shouldForwardProp: (prop) => prop !== "editing",
-})<{ editing: boolean }>(({ editing }) => ({
+  shouldForwardProp: (prop) => !["editing", "bookWorkspace"].includes(String(prop)),
+})<{ editing: boolean; bookWorkspace?: boolean }>(({ editing, bookWorkspace }) => ({
+  width: "100%",
+  maxWidth: bookWorkspace ? 1120 : undefined,
+  marginInline: bookWorkspace ? "auto" : undefined,
   height: editing ? "100%" : undefined,
   minHeight: 0,
   "& > :not(.text-editor-paper)": { flexShrink: 0 },
@@ -175,6 +179,14 @@ export const PreviewDocument = styled(Box)(({ theme }) => ({
   "& .markdown p": { marginBlock: "1em" },
   "& .markdown > :last-child": { marginBottom: 0 },
 })) as typeof Box;
+
+export const ReadingButton = styled(ButtonBase)(({ theme }) => ({
+  justifyContent: "flex-start", textAlign: "left", maxWidth: "100%",
+  font: "inherit", color: "inherit", overflowWrap: "anywhere",
+  borderRadius: theme.shape.borderRadius,
+  "&:hover": { color: theme.palette.primary.main },
+  "&.Mui-focusVisible": { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: 2 },
+}));
 
 export const SidebarRow = styled(Box, {
   shouldForwardProp: (prop) => !["active", "dropTarget"].includes(String(prop)),

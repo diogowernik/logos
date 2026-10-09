@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useProjectEditor } from "./useProjectEditor";
 import { createPortal } from "react-dom";
 import { Markdown } from "@/components/Markdown";
@@ -9,9 +9,7 @@ import {
   SaveIcon,
   SidebarIcon,
 } from "@/components/icons/NavigationIcons";
-import { ProjectCover } from "./ProjectCover";
-import { ProjectFiles } from "./ProjectFiles";
-import { ProjectExport } from "./ProjectExport";
+import { ProjectOverview } from "./ProjectOverview";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Card from "@mui/material/Card";
@@ -28,9 +26,6 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import TextField from "@mui/material/TextField";
 import Divider from "@mui/material/Divider";
-import Accordion from "@mui/material/Accordion";
-import AccordionSummary from "@mui/material/AccordionSummary";
-import AccordionDetails from "@mui/material/AccordionDetails";
 import {
   HeaderActions,
   CompactActionButton,
@@ -61,6 +56,7 @@ export function ProjectEditor({
   initialView?: "overview" | "text" | "new" | "book";
   initialTextId?: number;
 }) {
+  const editor = useProjectEditor({ projectId, initialView, initialTextId });
   const {
     data,
     selected,
@@ -80,29 +76,27 @@ export function ProjectEditor({
     dirty,
     projects,
     collections,
-    readBook,
-    copyBook,
-    updateCover,
     save,
     copy,
     textAction,
     projectAction,
     saveProperties,
     move,
-    beginDrag,
-    dragOver,
-    finishDrag,
-    keyboardOrder,
     restoreProject,
-    updateEpub,
-  } = useProjectEditor({ projectId, initialView, initialTextId });
+  } = editor;
   const {
     rightOpen: previewOpen,
     setRightOpen: setPreviewOpen,
     rightHost: previewHost,
+    setRightContext,
   } = useShell();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const canPreview = Boolean(data) && view === "text";
+  useEffect(() => {
+    if (view !== "overview") return;
+    setRightContext({ key: `book-${projectId}`, defaultOpen: false });
+    return () => setRightContext(null);
+  }, [view, projectId, setRightContext]);
   if (!data)
     return (
       <Stack spacing={2}>
@@ -117,12 +111,11 @@ export function ProjectEditor({
       </Stack>
     );
   const project = data.project;
-  const primary = data.texts.filter((text) => text.parent === null);
 
   const collection = collections.find((item) => item.id === project.collection);
 
   return (
-    <EditorWorkspace editing={view === "text"} spacing={2}>
+    <EditorWorkspace bookWorkspace={view === "overview"} editing={view === "text"} spacing={2}>
       <WorkspacePath>
         <WorkspaceBreadcrumbs aria-label="Caminho">
           <Link href="/">Biblioteca</Link>
@@ -182,160 +175,7 @@ export function ProjectEditor({
       {error && !properties && !moving && (
         <Alert severity="error">{error}</Alert>
       )}
-      {view === "overview" && (
-        <Stack component="section" spacing={2}>
-          <Card>
-            <CardHeader
-              title={project.is_inbox ? "Textos soltos" : project.title}
-              slotProps={{ title: { component: "h1", variant: "h6" } }}
-              action={
-                <HeaderActions>
-                  <Button onClick={readBook} disabled={!primary.length}>
-                    Ler livro
-                  </Button>
-                  <CompactActionButton label="Copiar livro" onClick={copyBook}>
-                    <CopyIcon />
-                  </CompactActionButton>
-                  <Button variant="text" onClick={() => setProperties(true)}>
-                    Editar informações
-                  </Button>
-                </HeaderActions>
-              }
-            />
-            <CardContent>
-              <Stack
-                direction="row"
-                spacing={2}
-                sx={{ alignItems: "flex-start" }}
-              >
-                {!project.is_inbox && (
-                  <ProjectCover project={project} onChange={updateCover} />
-                )}
-                <Stack spacing={1}>
-                  {project.subtitle && (
-                    <Typography>{project.subtitle}</Typography>
-                  )}
-                  {project.author && (
-                    <Typography color="text.secondary">
-                      {project.author}
-                    </Typography>
-                  )}
-                  <Typography color="text.secondary">
-                    {primary.length} {primary.length === 1 ? "texto" : "textos"}
-                  </Typography>
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-          {!project.is_inbox && (
-            <ProjectExport
-              projectId={project.id}
-              artifact={data.epub ?? null}
-              hasContent={primary.some((text) => text.markdown.trim())}
-              onChange={updateEpub}
-            />
-          )}
-          <Card component="section">
-            <CardHeader
-              slotProps={{ title: { component: "h2", variant: "h6" } }}
-              title="Sumário"
-              action={
-                <Button component={Link} href={`/projects/${project.id}/new`}>
-                  + Adicionar texto
-                </Button>
-              }
-            />
-            <CardContent>
-              {primary.length === 0 && (
-                <Typography color="text.secondary">
-                  Adicione seu primeiro texto para começar.
-                </Typography>
-              )}
-              {primary.map((text, index) => (
-                <Box
-                  data-text-id={text.id}
-                  key={text.id}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    py: 0.5,
-                    borderBottom: 1,
-                    borderColor: "divider",
-                  }}
-                >
-                  <IconButton
-                    aria-label={`Reordenar ${text.title || `texto ${index + 1}`}`}
-                    title="Arraste para reordenar; use as setas do teclado quando focado"
-                    sx={{ touchAction: "none", cursor: "grab" }}
-                    onPointerDown={(event) => beginDrag(event, text.id)}
-                    onPointerMove={dragOver}
-                    onPointerUp={finishDrag}
-                    onPointerCancel={finishDrag}
-                    onKeyDown={(event) => {
-                      if (["ArrowUp", "ArrowDown"].includes(event.key)) {
-                        event.preventDefault();
-                        void keyboardOrder(
-                          text.id,
-                          event.key === "ArrowUp" ? -1 : 1,
-                        );
-                      }
-                    }}
-                  >
-                    ⠿
-                  </IconButton>
-                  <Typography variant="caption" color="text.secondary">
-                    {String(index + 1).padStart(2, "0")}
-                  </Typography>
-                  <Box
-                    component={Link}
-                    href={`/texts/${text.id}`}
-                    sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}
-                  >
-                    {text.title || "Sem título"}
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    {text.markdown.trim()
-                      ? text.markdown.trim().split(/\s+/).length
-                      : 0}{" "}
-                    palavras
-                  </Typography>
-                </Box>
-              ))}
-            </CardContent>
-          </Card>
-          <ProjectFiles
-            project={project}
-            assets={data.assets ?? []}
-            onChange={updateCover}
-          />
-          {data.versions.length > 1 && (
-            <Accordion>
-              <AccordionSummary>Versões do projeto</AccordionSummary>
-              <AccordionDetails>
-                <Stack spacing={1}>
-                  {data.versions.map((version) => (
-                    <Box
-                      component={Link}
-                      key={version.id}
-                      href={`/projects/${version.id}`}
-                    >
-                      {version.is_principal ? "● " : "○ "}
-                      {version.title}
-                      <Typography variant="caption" sx={{ ml: 1 }}>
-                        {version.is_principal
-                          ? "Principal"
-                          : `${version.text_count} textos`}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-          )}
-          {notice && <Typography role="status">{notice}</Typography>}
-        </Stack>
-      )}
+      {view === "overview" && <ProjectOverview editor={editor} />}
       {view === "book" && (
         <Card component="section">
           <CardHeader

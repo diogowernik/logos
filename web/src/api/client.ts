@@ -3,6 +3,7 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly fieldErrors: Record<string, string[]> = {},
+    readonly payload: unknown = undefined,
   ) { super(message); }
 }
 
@@ -18,8 +19,10 @@ function responseError(payload: unknown, status: number, labels: FieldLabels): A
       value.forEach((entry, index) => collect(entry,
         typeof entry === "object" && entry !== null ? `${path}[${index}]` : path));
     } else if (value && typeof value === "object") {
-      Object.entries(value).forEach(([key, entry]) => collect(entry,
-        ["detail", "non_field_errors"].includes(key) ? path : path ? `${path}.${key}` : key));
+      Object.entries(value).forEach(([key, entry]) => {
+        if (!path && key === "diagnostic") return;
+        collect(entry, ["detail", "non_field_errors"].includes(key) ? path : path ? `${path}.${key}` : key);
+      });
     }
   }
   collect(payload);
@@ -28,7 +31,7 @@ function responseError(payload: unknown, status: number, labels: FieldLabels): A
     return `${label ? `${label}: ` : ""}${messages.join(" ")}`;
   }).join(" ");
   return new ApiError(message || fallbackMessage, status,
-    Object.fromEntries([...errors].filter(([field]) => field)));
+    Object.fromEntries([...errors].filter(([field]) => field)), payload);
 }
 
 async function request(path: string, init: RequestInit = {}, fieldLabels: FieldLabels = {}): Promise<Response> {

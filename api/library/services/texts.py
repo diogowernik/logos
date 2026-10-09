@@ -5,6 +5,15 @@ from ..models import Project, Text
 from .projects import next_position
 
 
+def locked_text(text):
+    """Call inside a transaction; serialize edits with confirmed EPUB replacement."""
+    Project.objects.select_for_update().get(pk=text.project_id)
+    current = Text.objects.filter(pk=text.pk, project_id=text.project_id).first()
+    if current is None:
+        raise ValidationError("Este texto foi removido ou movido. Atualize o projeto.")
+    return current
+
+
 @transaction.atomic
 def reorder_texts(project, ids):
     if not isinstance(ids, list) or any(type(item) is not int for item in ids):
@@ -20,9 +29,16 @@ def reorder_texts(project, ids):
 
 @transaction.atomic
 def move_text(text, project):
+    list(
+        Project.objects.select_for_update()
+        .filter(pk__in=[text.project_id, project.pk])
+        .order_by("pk")
+    )
+    text = locked_text(text)
     if text.parent_id:
         text.parent = None
     text.project = project
     text.position = next_position(project.texts.filter(parent=None))
     text.save()
     text.variations.update(project=project)
+    return text

@@ -36,7 +36,7 @@ def export_project_epub(project):
         cover=cover,
         images=images,
     )
-    filename = f"{slugify(project.title)[:200] or 'livro'}.epub"
+    basename = slugify(project.title)[:200] or "livro"
     # Prepare completely before changing the last successful export.
     artifact = None
     new_name = None
@@ -45,8 +45,11 @@ def export_project_epub(project):
             Project.objects.select_for_update().get(pk=project.pk)
             artifact = ExportArtifact.objects.filter(project=project).first()
             old_name = artifact.file.name if artifact else None
+            generation = artifact.generation + 1 if artifact else 1
             artifact = artifact or ExportArtifact(project=project)
+            filename = f"{basename}_v{generation}.epub"
             artifact.filename = filename
+            artifact.generation = generation
             artifact.sha256 = hashlib.sha256(content).hexdigest()
             artifact.compiler_version = COMPILER_VERSION
             artifact.file.save(filename, ContentFile(content), save=False)
@@ -60,3 +63,10 @@ def export_project_epub(project):
             artifact.file.storage.delete(new_name)
         raise
     return artifact
+
+
+@transaction.atomic
+def delete_project_epub(project):
+    Project.objects.select_for_update().get(pk=project.pk)
+    # The post_delete signal removes the stored file only after commit.
+    ExportArtifact.objects.filter(project=project).delete()

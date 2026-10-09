@@ -34,3 +34,14 @@ it("streams private images without converting bytes to text", async () => {
   expect(response.headers.get("content-type")).toBe("image/png");
   expect(response.headers.get("cache-control")).toBe("private, no-store");
 });
+
+it("preserves import provenance queries and structured errors through the authenticated proxy", async () => {
+  const diagnostic = { detail: "Atualize a prévia", diagnostic: { copy_text: "Relatório de conflito" } };
+  mocks.djangoFetch.mockResolvedValue(Response.json(diagnostic, { status: 409 }));
+  const response = await GET(new NextRequest("http://localhost:3000/api/library/epub-imports/job/preview?project=1&source=original"),
+    { params: Promise.resolve({ path: ["epub-imports", "job", "preview"] }) });
+  expect(mocks.djangoFetch.mock.calls[0][0]).toBe("/api/library/epub-imports/job/preview/?project=1&source=original");
+  expect(mocks.djangoFetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual(diagnostic);
+});

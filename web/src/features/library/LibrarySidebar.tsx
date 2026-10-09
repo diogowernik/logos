@@ -120,7 +120,10 @@ export function LibrarySidebar() {
         <Box id="sidebar-projects">
           {library.projects.map((project) => {
             const open =
-              expanded[project.id] ?? library.active?.project === project.id;
+              expanded[project.id] ??
+              (library.active?.project === project.id &&
+                (library.active.text !== null ||
+                  pathname === `/projects/${project.id}/new`));
             const content = library.contents[project.id];
             return (
               <Box key={project.id}>

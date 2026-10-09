@@ -1,12 +1,8 @@
-# Desenvolvimento do Logos
-
-Aplicação logos
-
-Fundação Django/DRF + Next.js/React/TypeScript, com autenticação privada.
+# Desenvolvimento
 
 ## Preparar
 
-Instale Python e Node compatíveis com os manifestos e o gerenciador `uv`.
+Use Python e Node compatíveis com os manifestos e o gerenciador `uv`.
 A partir da raiz:
 
 ```bash
@@ -14,15 +10,12 @@ bash scripts/setup.sh
 ./.venv/bin/python api/manage.py createsuperuser
 ```
 
-O gerador já executa o setup por padrão. Use o comando acima para retomar a
-preparação ou se gerou com `--skip-setup`. O setup cria os ambientes a partir
-dos exemplos somente quando ausentes, instala os locks e migra o banco local.
-Não cria credenciais. Não execute preparação de desenvolvimento sobre um
-banco de produção.
+Setup instala os locks, migra o banco local e copia exemplos de ambiente apenas
+quando ausentes. Não cria credenciais. Não execute esse setup sobre produção.
 
 ## Executar
 
-Em terminais separados, a partir da raiz:
+Em terminais separados:
 
 ```bash
 ./.venv/bin/python api/manage.py runserver 127.0.0.1:8000
@@ -33,37 +26,63 @@ cd web
 npm run dev -- --port 3000
 ```
 
-Acesse `http://localhost:3000`. Ao alterar portas, ajuste `DJANGO_API_URL` e
-origens do ambiente. O usuário criado pelo Django autentica no frontend.
+Abra `http://localhost:3000`. Ao mudar portas, ajuste `DJANGO_API_URL` e origens.
+Ambientes: `api/.env` e `web/.env.local`; o usuário Django autentica no frontend.
 
-## Validar
+## Validação conforme a mudança
+
+Escolha os comandos pertinentes, sem executar toda a lista a cada microajuste.
+Para uma seleção de testes Django, acrescente o módulo ou classe ao comando:
 
 ```bash
-DJANGO_ENV=development ./.venv/bin/python api/manage.py test
+DJANGO_ENV=development ./.venv/bin/python api/manage.py test library config
 ./.venv/bin/ruff check api
-cd web
+```
+
+No diretório `web`, conforme necessário:
+
+```bash
 npm run lint
 NEXT_DIST_DIR=.next-codex npm run typecheck
 npm test
 NEXT_DIST_DIR=.next-codex npm run build
 ```
 
-Da raiz, após o build, teste a integração real entre Next e Django em processos
-temporários, banco descartável e portas livres:
+Quando a mudança afetar autenticação, após o build, da raiz:
 
 ```bash
 ./.venv/bin/python scripts/test_auth.py
 ```
 
-Esse teste verifica login, cookie, página protegida, sessão inválida e logout
-sem usar credenciais reais ou alterar o banco de desenvolvimento.
+Esse teste usa banco descartável, processos temporários e portas livres; não
+usa credenciais reais nem altera o banco local. A checagem visual é feita pelo
+usuário. Alterações apenas de documentação exigem conferir links e diff.
+
+## Fontes locais dos livros
+
+Confira o `family_id` no banco; não deduza pelo título nem assuma `project_id`.
+A pasta é estável mesmo ao renomear o livro:
+
+```text
+api/media/projects/<family-id>/
+├── sources/markdown/         # 01-ato.md, 02-ato.md, …
+├── originals/               # EPUB de origem, imutável
+├── images/                  # assets enviados
+└── ebooks/                  # exportações; imports/ para cópias limpas
+```
+
+Crie somente pastas necessárias. Nomes numerados ordenam os Markdown sem mudar
+headings internos. Uma nota local de procedência pode registrar origens e hashes.
+A interface descobre arquivos dessas pastas: EPUB requer vínculo explícito;
+Markdown requer geração de textos. Editar arquivos não sincroniza o banco.
+Os [contratos técnicos](technical.md) explicam limites e lifecycle dos arquivos.
+
+Banco, ambientes e media ficam fora do Git. Faça backup do banco e dos arquivos.
 
 ## Produção
 
-Configure `DJANGO_ENV=production`, `DJANGO_DEBUG=false`, `DJANGO_SECRET_KEY`
-aleatória com pelo menos 50 caracteres e `DJANGO_ALLOWED_HOSTS` explícitos.
-Use `DATABASE_URL` conforme o destino, HTTPS e backup adequado. Next exige
-`DJANGO_API_URL` e `APP_ORIGIN` pública. Não versione segredos.
-
-Build e start devem usar o mesmo `NEXT_DIST_DIR`. A implantação específica não
-é automatizada por esta fundação. Consulte [fundação](foundation.md).
+Configure `DJANGO_ENV=production`, `DJANGO_DEBUG=false`, segredo aleatório com
+pelo menos 50 caracteres, hosts explícitos, `DATABASE_URL`, HTTPS e backups.
+Next exige `DJANGO_API_URL` e `APP_ORIGIN` pública. Variáveis de processo prevalecem
+sobre `.env`; confiança em proxy Django é opt-in. Não versione segredos.
+Build e start devem usar o mesmo `NEXT_DIST_DIR`.

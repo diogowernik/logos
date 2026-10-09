@@ -8,12 +8,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const token = await getAuthToken();
   if (!token) return noStoreJson({ detail: "Entre para continuar." }, { status: 401 });
   const { path } = await context.params;
+  const processing = path[0] === "epub-imports" || path.at(-1) === "local-epubs" ||
+    (request.method === "POST" && ["epub", "imports", "link-epub", "markdown-files", "markdown-preview", "markdown-import"].includes(path.at(-1) ?? ""));
   try {
     const upstream = await djangoFetch(`/api/library/${path.map(encodeURIComponent).join("/")}/${request.nextUrl.search}`, {
       method: request.method,
       headers: { Authorization: `Token ${token}`, "Content-Type": request.headers.get("content-type") ?? "application/json" },
       body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.arrayBuffer(),
-      ...(request.method === "POST" && path.at(-1) === "epub" ? { signal: AbortSignal.timeout(60_000) } : {}),
+      ...(processing ? { signal: AbortSignal.timeout(60_000) } : {}),
     });
     const headers = new Headers({ "Content-Type": upstream.headers.get("content-type") ?? "application/json",
       "Cache-Control": "private, no-store", "Vary": "Cookie" });

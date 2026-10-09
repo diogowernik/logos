@@ -11,10 +11,12 @@ from .chapters import prepare_chapters
 from .markdown import render_markdown
 from .validation import validate_archive
 
-COMPILER_VERSION = "logos-epub-1"
+COMPILER_VERSION = "logos-epub-2"
 STYLE = """
 body { line-height: 1.5; }
 img { display: block; margin: 1.2em auto; max-width: 100%; height: auto; }
+.image-portrait { width: 180px; }
+.image-landscape { width: 300px; }
 h1 { page-break-before: always; }
 body > h1:first-child { page-break-before: avoid; }
 h2 { margin-top: 1.5em; margin-bottom: .6em; }
@@ -46,6 +48,10 @@ class ImageResource:
         extension = {"image/jpeg": "jpg", "image/png": "png"}[mime_type]
         return f"images/{self.identifier}.{extension}", content, mime_type
 
+    def orientation_class(self) -> str:
+        with Image.open(BytesIO(self.content)) as image:
+            return "image-landscape" if image.width > image.height else "image-portrait"
+
 
 def generate_epub(manuscript, *, identifier, author="", cover=None, images=()) -> bytes:
     if not manuscript.markdown().strip():
@@ -76,6 +82,10 @@ def generate_epub(manuscript, *, identifier, author="", cover=None, images=()) -
     for chapter in chapters:
         for tag in chapter.html.find_all("img", src=True):
             image = image_map.get(urlsplit(tag["src"]).path.rstrip("/"))
+            tag["class"] = [
+                *tag.get("class", []),
+                image.orientation_class() if image else "image-portrait",
+            ]
             if image:
                 name, content, mime_type = image.epub_image()
                 tag["src"] = name

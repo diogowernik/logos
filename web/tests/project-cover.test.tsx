@@ -13,6 +13,7 @@ import type { Project } from "@/features/library/types";
 
 const project: Project = {
   id: 1,
+  slug: "livro",
   title: "Livro",
   subtitle: "",
   author: "",

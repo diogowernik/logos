@@ -1,8 +1,9 @@
 "use client";
+import { projectLocation, collectionLocation } from "./resource-location";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { textLocation } from "./text-location";
 import { libraryRequest, errorMessage } from "./api";
 import { useLibrary } from "./LibraryShell";
@@ -39,7 +40,26 @@ export function LibrarySidebar() {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [projectsOpen, setProjectsOpen] = useState(true);
-  const [recentOpen, setRecentOpen] = useState(true);
+  const [recentPreference, setRecentPreference] = useState<boolean | null>(null);
+  const recentOpen = recentPreference ?? true;
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      try {
+        const saved = localStorage.getItem("logos.sidebar.recents-open");
+        if (active && (saved === "true" || saved === "false")) {
+          setRecentPreference((current) => current ?? saved === "true");
+        }
+      } catch { /* Local preferences never block navigation. */ }
+    });
+    return () => { active = false; };
+  }, []);
+  function toggleRecents() {
+    const next = !recentOpen;
+    setRecentPreference(next);
+    try { localStorage.setItem("logos.sidebar.recents-open", String(next)); }
+    catch { /* The control still works when browser storage is unavailable. */ }
+  }
   const [moving, setMoving] = useState<TextSummary | null>(null);
   const [pending, setPending] = useState(false);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
@@ -124,7 +144,7 @@ export function LibrarySidebar() {
               expanded[project.id] ??
               (library.active?.project === project.id &&
                 (library.active.text !== null ||
-                  pathname === `/projects/${project.id}/new`));
+                  pathname === `${projectLocation(project)}/new`));
             const content = library.contents[project.id];
             return (
               <Box key={project.id}>
@@ -166,7 +186,7 @@ export function LibrarySidebar() {
                   </IconButton>
                   <ListItemButton
                     component={Link}
-                    href={`/projects/${project.id}`}
+                    href={projectLocation(project)}
                     sx={{ px: 0.5, minWidth: 0 }}
                     title={project.title}
                   >
@@ -176,20 +196,20 @@ export function LibrarySidebar() {
                     <ActionMenu label={`Opções do projeto ${project.title}`}>
                       <MenuItem
                         component={Link}
-                        href={`/projects/${project.id}`}
+                        href={projectLocation(project)}
                       >
                         Visão geral
                       </MenuItem>
                       <MenuItem
                         component={Link}
-                        href={`/projects/${project.id}/read`}
+                        href={`${projectLocation(project)}/read`}
                       >
                         Ler livro
                       </MenuItem>
                     </ActionMenu>
                     <IconButton
                       component={Link}
-                      href={`/projects/${project.id}/new`}
+                      href={`${projectLocation(project)}/new`}
                       aria-label={`Adicionar texto a ${project.title}`}
                     >
                       <ComposeIcon />
@@ -277,7 +297,7 @@ export function LibrarySidebar() {
         <ListItemButton
           component={Link}
           key={collection.id}
-          href={`/?collection=${collection.id}`}
+          href={collectionLocation(collection)}
           title={collection.title}
         >
           <ListItemIcon>
@@ -290,7 +310,7 @@ export function LibrarySidebar() {
         title="Recentes"
         open={recentOpen}
         controls="sidebar-recents"
-        onToggle={() => setRecentOpen(!recentOpen)}
+        onToggle={toggleRecents}
       />
       <Collapse in={recentOpen}>
         <Box id="sidebar-recents">

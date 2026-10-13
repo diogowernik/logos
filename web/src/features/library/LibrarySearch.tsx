@@ -1,4 +1,5 @@
 "use client";
+import { projectLocation } from "./resource-location";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Dialog from "@mui/material/Dialog";
@@ -129,7 +130,7 @@ export function LibrarySearch({
                   <ListItemButton
                     key={project.id}
                     component={Link}
-                    href={`/projects/${project.id}`}
+                    href={projectLocation(project)}
                     onClick={onClose}
                   >
                     <ListItemIcon>

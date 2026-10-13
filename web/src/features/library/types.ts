@@ -1,10 +1,12 @@
 export type Collection = {
+  slug: string;
   id: number;
   title: string;
   description: string;
   position: number;
 };
 export type Project = {
+  slug: string;
   id: number;
   title: string;
   subtitle: string;

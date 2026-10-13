@@ -1,4 +1,5 @@
 "use client";
+import { projectLocation, collectionLocation } from "./resource-location";
 import Link from "next/link";
 import MuiLink from "@mui/material/Link";
 import { useMemo, useState, type ReactNode } from "react";
@@ -21,6 +22,7 @@ import { ProjectFiles } from "./ProjectFiles";
 import { ProjectMarkdown } from "./ProjectMarkdown";
 import { ProjectExport } from "./ProjectExport";
 import { ProjectEpubs } from "./ProjectEpubs";
+import { EpubReadButton } from "./EpubReader";
 import type { useProjectEditor } from "./useProjectEditor";
 
 export function ProjectOverview({ editor, actions }: { editor: ReturnType<typeof useProjectEditor>; actions?: ReactNode }) {
@@ -55,11 +57,11 @@ export function ProjectOverview({ editor, actions }: { editor: ReturnType<typeof
         <BookIdentity>
           <ProjectCover project={project} onChange={updateCover} onBusy={callbacks.cover} blocked={blocked}/>
           <ProjectSummary>
-            {collection && <MuiLink component={Link} href={`/?collection=${collection.id}`}>{collection.title}</MuiLink>}
+            {collection && <MuiLink component={Link} href={collectionLocation(collection)}>{collection.title}</MuiLink>}
             {project.subtitle && <Typography>{project.subtitle}</Typography>}
             {project.author && <Typography color="text.secondary">{project.author}</Typography>}
             {!project.subtitle && !project.author && <Typography color="text.secondary">Sem subtítulo ou autor.</Typography>}
-            {data.epub && <MuiLink href={data.epub.url} download={data.epub.filename} aria-label="Baixar EPUB revisado">{data.epub.filename}</MuiLink>}
+            {data.epub && <HeaderActions><MuiLink href={data.epub.url} download={data.epub.filename} aria-label="Baixar EPUB revisado">{data.epub.filename}</MuiLink><EpubReadButton url={data.epub.url} filename={data.epub.filename} disabled={blocked}/></HeaderActions>}
           </ProjectSummary>
         </BookIdentity>
       </BookSection>}
@@ -68,7 +70,7 @@ export function ProjectOverview({ editor, actions }: { editor: ReturnType<typeof
         <ProjectGroups editor={editor} blocked={blocked} expanded={areas.texts} onToggle={() => toggle("texts")} actions={<HeaderActions>
           {!project.is_inbox && <div ref={setExportActionsHost}/>}
           <CompactActionButton label="Copiar todos os textos" disabled={blocked || !primary.some((text) => text.markdown.trim())} onClick={copyTexts}><CopyIcon /></CompactActionButton>
-          <Tooltip title="Adicionar texto"><span><IconButton component={Link} href={`/projects/${project.id}/new?group=${data.group.id}`} disabled={blocked} aria-label="Adicionar texto"><PlusIcon /></IconButton></span></Tooltip>
+          <Tooltip title="Adicionar texto"><span><IconButton component={Link} href={`${projectLocation(project)}/new?group=${data.group.id}`} disabled={blocked} aria-label="Adicionar texto"><PlusIcon /></IconButton></span></Tooltip>
         </HeaderActions>}>
           {notice && <Typography variant="body2" color="text.secondary" role="status">{notice}</Typography>}
           {primary.length === 0 && <Typography color="text.secondary">Nenhum texto neste grupo.</Typography>}

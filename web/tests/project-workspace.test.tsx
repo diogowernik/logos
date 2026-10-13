@@ -9,12 +9,14 @@ import type { EpubImportJob } from "@/features/library/import-types";
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
   requireUser: vi.fn(),
+  resolveResource: vi.fn(),
   router: { push: vi.fn(), replace: vi.fn() },
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => mocks.router,
-  usePathname: () => "/projects/1",
+  usePathname: () => "/projects/livro-a",
 }));
+vi.mock("@/server/library", () => ({ resolveResource: mocks.resolveResource }));
 vi.mock("@/server/auth", () => ({ requireUser: mocks.requireUser }));
 vi.mock("@/features/library/api", () => ({
   libraryRequest: mocks.request,
@@ -26,6 +28,7 @@ import { ProjectEditor } from "@/features/library/ProjectEditor";
 
 const project = {
   id: 1,
+  slug: "livro-a",
   title: "Livro A",
   subtitle: "",
   author: "",
@@ -111,7 +114,7 @@ function defaults(path: string, method?: string, body?: { cover?: string }) {
   if (path === "projects") return Promise.resolve([current.project]);
   if (path === "collections")
     return Promise.resolve([
-      { id: 7, title: "Coleção A", description: "", position: 0 },
+      { id: 7, title: "Coleção A", slug: "colecao", description: "", position: 0 },
     ]);
   if (path.startsWith("projects/1/content")) return Promise.resolve(current);
   if (path === "groups/1/epub" && method === "POST") {
@@ -143,8 +146,10 @@ beforeEach(() => {
 });
 
 it("opens the protected project route in the center with its operations and an empty right panel", async () => {
+  mocks.resolveResource.mockResolvedValue(project);
   const page = await ProjectPage({
-    params: Promise.resolve({ id: "1" }),
+    params: Promise.resolve({ id: "livro-a" }),
+    searchParams: Promise.resolve({}),
   });
   expect(mocks.requireUser).toHaveBeenCalledOnce();
   render(<LibraryShell>{page}</LibraryShell>);
@@ -162,14 +167,14 @@ it("opens the protected project route in the center with its operations and an e
   ).toHaveAttribute("href", "/");
   expect(within(main).getByRole("link", { name: "Coleção A" })).toHaveAttribute(
     "href",
-    "/?collection=7",
+    "/collections/colecao",
   );
   expect(
     within(panel).getByRole("link", { name: "Editar Capítulo A" }),
   ).toHaveAttribute("href", "/texts/2");
   expect(
     within(panel).getByRole("link", { name: "Adicionar texto" }),
-  ).toHaveAttribute("href", "/projects/1/new?group=1");
+  ).toHaveAttribute("href", "/projects/livro-a/new?group=1");
   const user = userEvent.setup();
   within(panel).getByRole("button", { name: "Reordenar Capítulo A" }).focus();
   await user.keyboard("{ArrowDown}");

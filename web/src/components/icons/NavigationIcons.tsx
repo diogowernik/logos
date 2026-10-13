@@ -64,6 +64,10 @@ export function LibraryIcon() {
   );
 }
 
+export function ReadIcon() {
+  return <Icon><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1Z"/><path d="M12 6v14"/></Icon>;
+}
+
 export function PlusIcon() {
   return (
     <Icon>

@@ -1,4 +1,5 @@
 "use client";
+import { projectLocation, collectionLocation } from "./resource-location";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { useProjectEditor } from "./useProjectEditor";
@@ -138,21 +139,16 @@ export function ProjectEditor({
         <WorkspaceBreadcrumbs aria-label="Caminho">
           <Link href="/">Biblioteca</Link>
           {collection && (
-            <Link href={`/?collection=${collection.id}`}>
+            <Link href={collectionLocation(collection)}>
               {collection.title}
             </Link>
           )}
           {!project.is_inbox && (
-            <Link href={`/projects/${project.id}`}>{project.title}</Link>
+            <Link href={projectLocation(project)}>{project.title}</Link>
           )}
-          {view === "text" && (
-            <Typography aria-current="page">{title || "Novo texto"}</Typography>
-          )}
-          {view === "book" && (
-            <Typography aria-current="page">Leitura</Typography>
-          )}
+          <Typography aria-current="page">Leitura</Typography>
         </WorkspaceBreadcrumbs>
-        {view !== "overview" && projectMenu}
+        {projectMenu}
       </WorkspacePath>}
       {error && !properties && !moving && (
         <Alert severity="error">{error}</Alert>

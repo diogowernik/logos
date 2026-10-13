@@ -1,4 +1,5 @@
 "use client";
+import { projectLocation } from "./resource-location";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -222,7 +223,7 @@ export function useProjectEditor({
       if (action === "delete") {
         await libraryRequest(`texts/${selected.id}`, "DELETE");
         await refresh(null);
-        router.push(data?.project.is_inbox ? "/" : `/projects/${projectId}`);
+        router.push(data && !data.project.is_inbox ? projectLocation(data.project) : "/");
       } else {
         const result = await libraryRequest<Text>(
           `texts/${selected.id}${action === "duplicate" ? "/duplicate" : ""}`,
@@ -250,7 +251,7 @@ export function useProjectEditor({
         await refreshLibrary(); router.push("/");
       } else {
         const project = await libraryRequest<Project>(`projects/${projectId}/duplicate`, "POST");
-        await refreshLibrary(); router.push(`/projects/${project.id}`);
+        await refreshLibrary(); router.push(projectLocation(project));
       }
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setPending(false); }

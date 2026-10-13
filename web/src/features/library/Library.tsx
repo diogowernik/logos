@@ -1,4 +1,5 @@
 "use client";
+import { projectLocation, collectionLocation } from "./resource-location";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -92,7 +93,7 @@ export function Library({
         );
         await refresh();
         setCreating(null);
-        router.push(`/?collection=${collection.id}`);
+        router.push(collectionLocation(collection));
       } else {
         const project = await libraryRequest<Project>("projects", "POST", {
           title,
@@ -100,7 +101,7 @@ export function Library({
         });
         await refresh();
         setCreating(null);
-        router.push(`/projects/${project.id}`);
+        router.push(projectLocation(project));
       }
     } catch (reason) {
       setError(errorMessage(reason));
@@ -131,11 +132,11 @@ export function Library({
     if (!pending) {
       setCreating(null);
       if (createKind)
-        router.push(collectionId ? `/?collection=${collectionId}` : "/");
+        router.push(selectedCollection ? collectionLocation(selectedCollection) : "/");
     }
   }
   return (
-    <EditorWorkspace component="section" editing={false} bookWorkspace spacing={2}>
+    <EditorWorkspace editing={false} bookWorkspace spacing={2}>
       <BookSection
           title={selectedCollection?.title ?? "Biblioteca"}
           expanded={booksExpanded}
@@ -178,7 +179,7 @@ export function Library({
                     {visible.map((project) => (
                       <LibraryItem
                         key={`project-${project.id}`}
-                        href={`/projects/${project.id}`}
+                        href={projectLocation(project)}
                         title={project.title}
                         coverUrl={project.cover_url}
                       />
@@ -238,7 +239,7 @@ export function Library({
         <HeaderActions><CompactActionButton label="Criar coleção" onClick={() => setCreating("collection")}><PlusIcon /></CompactActionButton></HeaderActions>
       }>
         <LibraryGrid>
-          {visibleCollections.map((collection) => <LibraryItem key={collection.id} href={`/?collection=${collection.id}`} title={collection.title} collection coverUrl={projects.find((project) => project.collection === collection.id)?.cover_url}/>) }
+          {visibleCollections.map((collection) => <LibraryItem key={collection.id} href={collectionLocation(collection)} title={collection.title} collection coverUrl={projects.find((project) => project.collection === collection.id)?.cover_url}/>) }
         </LibraryGrid>
       </BookSection>}
       <LibrarySearch

@@ -151,7 +151,7 @@ it("deletes only after confirmation and updates the empty export state", async (
   expect(
     screen.queryByRole("link", { name: "Baixar EPUB" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByText("Nenhum EPUB gerado.")).toBeVisible();
+  expect(screen.queryByText("Nenhum EPUB gerado.")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Gerar EPUB" })).toBeEnabled();
 });
 

@@ -75,3 +75,9 @@ de foco, Escape e backdrop; navegação cancelada não fecha a lateral.
 selecionado ocupa a leitura lateral; clicar para ler não implica entrar na edição.
 Para mudanças no shell, preserve rascunho, foco e navegação cancelada. A validação
 visual é feita pelo usuário com prints.
+
+O leitor de EPUB é compartilhado em `features/library/EpubReader.tsx`, com
+geometria em `theme/epub-reader.ts`. Carrega EPUB.js somente ao abrir o modal,
+busca o arquivo pelo proxy privado e preserva a formatação do livro. Scripts
+do EPUB ficam desabilitados; fechar cancela a busca e libera o leitor. O nome
+do arquivo continua sendo download; o ícone de livro abre a leitura.

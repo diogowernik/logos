@@ -35,6 +35,12 @@ Livro novo inclui um grupo; criar/duplicar outro não muda seu padrão. Inbox e
 incluem todos os grupos; abrir Text resolve seu grupo. Locks ordenam livro antes
 de grupo quando ambos são necessários; edição/substituição usam lock do grupo.
 
+Livros e coleções têm `slug` único por proprietário, estável ao renomear; duplicatas
+recebem sufixo. URLs web usam `/projects/<slug>` e `/collections/<slug>`; links
+antigos com ID (incluindo `/?collection=<id>`) redirecionam preservando a query.
+A API aceita ID ou slug nesses recursos; relações e operações internas continuam
+usando IDs. A migração preenche slugs dos registros existentes.
+
 Todos os endpoints abaixo são privados em `/api/library/`.
 
 | Endpoint | Contrato necessário à interface |

@@ -11,7 +11,8 @@ from .services.texts import locked_text
 class CollectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collection
-        fields = ["id", "title", "description", "position"]
+        fields = ["id", "slug", "title", "description", "position"]
+        read_only_fields = ["slug"]
 
 
 class TextSerializer(serializers.ModelSerializer):
@@ -97,12 +98,14 @@ class TextListSerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    slug = serializers.CharField(read_only=True)
     cover_url = serializers.SerializerMethodField()
     text_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = [
+            "slug",
             "id",
             "title",
             "subtitle",

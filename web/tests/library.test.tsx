@@ -23,6 +23,7 @@ import { OpenText } from "@/features/library/OpenText";
 
 const project = {
   id: 1,
+  slug: "meu-projeto",
   title: "Meu projeto",
   subtitle: "",
   author: "",
@@ -80,7 +81,7 @@ it("creates a project with only its title and opens its overview", async () => {
     title: "Meu projeto",
     collection: null,
   });
-  expect(mocks.router.push).toHaveBeenCalledWith("/projects/1");
+  expect(mocks.router.push).toHaveBeenCalledWith("/projects/meu-projeto");
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
   );
@@ -120,7 +121,7 @@ it("searches projects and text content in a dialog and returns focus when closed
   });
   expect(
     within(projects).getByRole("link", { name: "Meu projeto" }),
-  ).toHaveAttribute("href", "/projects/1");
+  ).toHaveAttribute("href", "/projects/meu-projeto");
   expect(within(texts).getByRole("link", { name: /Ideia/ })).toHaveAttribute(
     "href",
     "/texts/2",

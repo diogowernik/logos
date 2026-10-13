@@ -31,7 +31,16 @@ from .services.texts import locked_text
 from .source_views import ProjectSourcesMixin
 
 
-class CollectionViewSet(viewsets.ModelViewSet):
+class SlugLookupMixin:
+    def get_object(self):
+        reference = self.kwargs[self.lookup_url_kwarg or self.lookup_field]
+        lookup = {"pk" if reference.isdecimal() else "slug": reference}
+        obj = get_object_or_404(self.filter_queryset(self.get_queryset()), **lookup)
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+
+class CollectionViewSet(SlugLookupMixin, viewsets.ModelViewSet):
     serializer_class = CollectionSerializer
 
     def get_queryset(self):
@@ -41,7 +50,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         serializer.save(owner=self.request.user)
 
 
-class ProjectViewSet(ProjectSourcesMixin, viewsets.ModelViewSet):
+class ProjectViewSet(SlugLookupMixin, ProjectSourcesMixin, viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
 
     def get_queryset(self):

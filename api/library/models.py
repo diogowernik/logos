@@ -1,11 +1,38 @@
 import uuid
 
 from django.conf import settings
-from django.db import models
+from django.contrib.auth import get_user_model
+from django.db import models, transaction
 from django.db.models import Q
+from django.utils.text import slugify
 
 
-class Collection(models.Model):
+class SluggedResource(models.Model):
+    slug = models.SlugField(max_length=250, editable=False)
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self.slug:
+            return super().save(*args, **kwargs)
+        with transaction.atomic():
+            # Serialize allocations for the same owner, including concurrent creates.
+            get_user_model().objects.select_for_update().get(pk=self.owner_id)
+            base = slugify(self.title)[:240] or "sem-titulo"
+            if base.isdecimal() or base == "inbox":
+                base = f"titulo-{base}"[:240]
+            candidate, suffix = base, 2
+            while type(self).objects.filter(owner_id=self.owner_id, slug=candidate).exists():
+                candidate = f"{base}-{suffix}"
+                suffix += 1
+            self.slug = candidate
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"slug"}
+            return super().save(*args, **kwargs)
+
+
+class Collection(SluggedResource):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     title = models.CharField(max_length=250)
     description = models.TextField(blank=True)
@@ -13,9 +40,12 @@ class Collection(models.Model):
 
     class Meta:
         ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "slug"], name="collection_owner_slug")
+        ]
 
 
-class Project(models.Model):
+class Project(SluggedResource):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     collection = models.ForeignKey(Collection, null=True, blank=True, on_delete=models.SET_NULL)
     title = models.CharField(max_length=250, default="Sem título")
@@ -35,9 +65,10 @@ class Project(models.Model):
     class Meta:
         ordering = ["position", "id"]
         constraints = [
+            models.UniqueConstraint(fields=["owner", "slug"], name="project_owner_slug"),
             models.UniqueConstraint(
                 fields=["owner"], condition=Q(is_inbox=True), name="one_inbox_per_user"
-            )
+            ),
         ]
 
 

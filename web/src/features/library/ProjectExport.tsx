@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { DeleteIcon } from "@/components/icons/NavigationIcons";
 import { errorMessage, libraryRequest } from "./api";
 import type { EpubArtifact } from "./types";
+import { EpubReadButton } from "./EpubReader";
 import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import {
@@ -97,6 +98,7 @@ export function ProjectExport({
           <ProjectFileInfo>
             <HeaderActions>
             <Link aria-label="Baixar EPUB" href={artifact.url} download={artifact.filename}>{artifact.filename}</Link>
+            <EpubReadButton url={artifact.url} filename={artifact.filename} disabled={pending || blocked}/>
             <CompactActionButton
               label="Excluir EPUB"
               disabled={pending || blocked}

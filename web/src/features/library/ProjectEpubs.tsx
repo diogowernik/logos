@@ -15,6 +15,7 @@ import { useEpubImport } from "./useEpubImport";
 import { ImportFeedback } from "./ImportFeedback";
 import { ImportWarnings } from "./ImportWarnings";
 import { EpubCleanDialog } from "./EpubCleanDialog";
+import { EpubReadButton } from "./EpubReader";
 import { TextImportDialog } from "./TextImportDialog";
 import { ImportSourceSelect } from "@/theme/epub-import";
 export function ProjectEpubs({ projectId, groupId, groups, jobs, onJob, onExtracted, onBusy, onLocalBusy, blocked = false, expanded, onToggle, onRead, }: {
@@ -56,6 +57,7 @@ export function ProjectEpubs({ projectId, groupId, groups, jobs, onJob, onExtrac
               <Link href={job.original_url} download={job.original_name}>{job.original_name}</Link>
             </ProjectFileInfo>
             <HeaderActions>
+              <EpubReadButton url={job.original_url} filename={job.original_name} disabled={blocked || Boolean(pending)}/>
               <CompactActionButton label="Gerar EPUB limpo" disabled={blocked || Boolean(pending) || job.status === "processing"} onClick={controller.reviewClean}><CleanIcon /></CompactActionButton>
               <CompactActionButton label="Criar textos a partir do EPUB original" tooltip="Criar textos a partir desse EPUB" disabled={blocked || Boolean(pending)} onClick={() => controller.loadPreview("original")}><ExtractIcon /></CompactActionButton>
             </HeaderActions>
@@ -67,7 +69,10 @@ export function ProjectEpubs({ projectId, groupId, groups, jobs, onJob, onExtrac
           </HeaderActions>}
           {job.clean_url && <BookSourceRow>
             <ProjectFileInfo><Link href={job.clean_url} download={job.clean_filename}>{job.clean_filename}</Link></ProjectFileInfo>
+            <HeaderActions>
+            <EpubReadButton url={job.clean_url} filename={job.clean_filename} disabled={blocked || Boolean(pending)}/>
             <CompactActionButton label="Criar textos a partir do EPUB limpo" tooltip="Criar textos a partir desse EPUB" disabled={blocked || Boolean(pending)} onClick={() => controller.loadPreview("cleaned")}><ExtractIcon /></CompactActionButton>
+            </HeaderActions>
           </BookSourceRow>}
           <EpubCleanDialog key={job.id} job={job} open={cleanOpen} selected={controller.sections} onSelection={controller.setSections} onClose={() => controller.setCleanOpen(false)} onClean={controller.clean} pending={pending} error={controller.error}/>
           <TextImportDialog destination={{groups, target: controller.target, name: controller.newName, disabled: Boolean(pending), onName: controller.setNewName, onTarget: (next) => { void controller.loadPreview(controller.source, next); }}} open={previewOpen} preview={controller.preview} source={controller.source} stale={controller.stale} pending={pending} error={controller.error} onClose={() => controller.setPreviewOpen(false)} onReload={() => controller.loadPreview(controller.source)} onExtract={controller.extract}/>

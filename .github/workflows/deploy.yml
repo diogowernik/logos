@@ -1,0 +1,74 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - deploy-all
+      - deploy-api
+      - deploy-web
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Parte do Logos para publicar
+        required: true
+        type: choice
+        options:
+          - all
+          - api
+          - web
+      install:
+        description: Instalar dependencias antes da build
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: logos-deploy-${{ github.event.inputs.target || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target
+        id: resolve
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            target="${{ github.event.inputs.target }}"
+          else
+            case "${GITHUB_REF_NAME}" in
+              deploy-all) target="all" ;;
+              deploy-api) target="api" ;;
+              deploy-web) target="web" ;;
+              *)
+                echo "Branch de deploy invalida: ${GITHUB_REF_NAME}"
+                exit 1
+                ;;
+            esac
+          fi
+          echo "target=${target}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.DEPLOY_SSH_PORT || 22 }}" \
+            "${{ secrets.DEPLOY_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Run deploy
+        shell: bash
+        run: |
+          install_flag=""
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && \
+                "${{ github.event.inputs.install }}" == "true" ]]; then
+            install_flag=" --install"
+          fi
+
+          ssh -i ~/.ssh/deploy_key \
+            -p "${{ secrets.DEPLOY_SSH_PORT || 22 }}" \
+            "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" \
+            "cd ~/logos && ./deploy '${{ steps.resolve.outputs.target }}'${install_flag}"

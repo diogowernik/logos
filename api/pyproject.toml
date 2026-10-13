@@ -17,6 +17,11 @@ dependencies = [
     "beautifulsoup4>=4.13,<5",
 ]
 
+[project.optional-dependencies]
+production = [
+    "gunicorn>=23",
+]
+
 [dependency-groups]
 dev = ["ruff>=0.14,<0.15"]
 

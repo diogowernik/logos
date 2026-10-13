@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+TARGET="${1:-}"
+INSTALL_DEPS=0
+SKIP_PULL=0
+BRANCH="${DEPLOY_BRANCH:-main}"
+
+usage() {
+  echo "Uso: ./deploy <all|api|web> [--install] [--skip-pull]"
+  echo
+  echo "  --install    Instala dependencias antes da build"
+  echo "  --skip-pull  Usa a revisao atual (util para rollback)"
+}
+
+for argument in "${@:2}"; do
+  case "$argument" in
+    --install) INSTALL_DEPS=1 ;;
+    --skip-pull) SKIP_PULL=1 ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Opcao desconhecida: $argument"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+case "$TARGET" in
+  all|api|web) ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
+
+WEB_PORT="${LOGOS_WEB_PORT:-3026}"
+API_PORT="${LOGOS_API_PORT:-8026}"
+WEB_PROCESS="logos-web"
+API_PROCESS="logos-api"
+
+ensure_pm2_process() {
+  local process_name="$1"
+  local process_pid
+
+  sleep 2
+  process_pid="$(pm2 pid "$process_name" | tail -n 1)"
+  if [[ ! "$process_pid" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Processo ${process_name} nao permaneceu online no PM2."
+    exit 1
+  fi
+}
+
+ensure_http_endpoint() {
+  local service_name="$1"
+  local endpoint="$2"
+
+  for _ in {1..10}; do
+    if curl --fail --silent --show-error --output /dev/null "$endpoint"; then
+      return
+    fi
+    sleep 1
+  done
+
+  echo "Endpoint de ${service_name} nao respondeu: ${endpoint}"
+  exit 1
+}
+
+for command_name in git flock pm2 curl; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "Comando obrigatorio nao encontrado: $command_name"
+    exit 1
+  fi
+done
+
+if [[ "$TARGET" == "all" || "$TARGET" == "web" ]] && ! command -v npm >/dev/null 2>&1; then
+  echo "Comando obrigatorio nao encontrado: npm"
+  exit 1
+fi
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_DIR="${LOGOS_VENV_DIR:-$ROOT_DIR/.venv}"
+PYTHON="$VENV_DIR/bin/python"
+GUNICORN="$VENV_DIR/bin/gunicorn"
+LOCK_FILE="${DEPLOY_LOCK_FILE:-/tmp/logos-deploy.lock}"
+STATE_DIR="$ROOT_DIR/.deploy"
+
+if [[ "$TARGET" != "web" && ! -x "$PYTHON" ]]; then
+  echo "Ambiente Python nao encontrado em $VENV_DIR"
+  exit 1
+fi
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Ja existe um deploy em andamento."
+  exit 1
+fi
+
+cd "$ROOT_DIR"
+mkdir -p "$STATE_DIR"
+git rev-parse HEAD > "$STATE_DIR/previous"
+
+echo "Deploy do Logos: $TARGET"
+if [[ "$SKIP_PULL" == "0" ]]; then
+  echo "Atualizando codigo..."
+  git pull --ff-only origin "$BRANCH"
+else
+  echo "Mantendo a revisao atual (--skip-pull)."
+fi
+
+if [[ "$TARGET" == "all" || "$TARGET" == "api" ]]; then
+  if [[ -f "$ROOT_DIR/api/db.sqlite3" ]]; then
+    backup_dir="$ROOT_DIR/api/backups"
+    mkdir -p "$backup_dir"
+    cp -p "$ROOT_DIR/api/db.sqlite3" "$backup_dir/db-$(date +%Y%m%d-%H%M%S).sqlite3"
+    echo "Backup do SQLite criado."
+  fi
+
+  if [[ "$INSTALL_DEPS" == "1" ]]; then
+    echo "Instalando dependencias da API..."
+    "$VENV_DIR/bin/pip" install -e "$ROOT_DIR/api[production]"
+    "$PYTHON" "$ROOT_DIR/api/manage.py" collectstatic --noinput
+  else
+    echo "Pulando dependencias e collectstatic da API."
+  fi
+
+  echo "Aplicando migrations..."
+  "$PYTHON" "$ROOT_DIR/api/manage.py" migrate --noinput
+
+  if pm2 describe "$API_PROCESS" >/dev/null 2>&1; then
+    PORT="$API_PORT" pm2 restart "$API_PROCESS" --update-env
+  else
+    PORT="$API_PORT" pm2 start "$GUNICORN" \
+      --name "$API_PROCESS" \
+      --cwd "$ROOT_DIR/api" \
+      --interpreter none
+  fi
+  ensure_pm2_process "$API_PROCESS"
+  ensure_http_endpoint "$API_PROCESS" "http://127.0.0.1:${API_PORT}/api/health/"
+fi
+
+if [[ "$TARGET" == "all" || "$TARGET" == "web" ]]; then
+  if [[ "$INSTALL_DEPS" == "1" ]]; then
+    echo "Instalando dependencias da web..."
+    npm ci --prefix "$ROOT_DIR/web"
+  else
+    echo "Pulando dependencias da web."
+  fi
+
+  echo "Gerando build da web..."
+  npm run build --prefix "$ROOT_DIR/web"
+
+  if pm2 describe "$WEB_PROCESS" >/dev/null 2>&1; then
+    PORT="$WEB_PORT" DJANGO_API_URL="http://127.0.0.1:$API_PORT" \
+      APP_ORIGIN="https://logos.wtr.ee" \
+      pm2 restart "$WEB_PROCESS" --update-env
+  else
+    PORT="$WEB_PORT" DJANGO_API_URL="http://127.0.0.1:$API_PORT" \
+      APP_ORIGIN="https://logos.wtr.ee" \
+      pm2 start npm --name "$WEB_PROCESS" --cwd "$ROOT_DIR/web" -- run start
+  fi
+  ensure_pm2_process "$WEB_PROCESS"
+  ensure_http_endpoint "$WEB_PROCESS" "http://127.0.0.1:${WEB_PORT}/"
+fi
+
+pm2 save
+
+echo "Deploy de $TARGET concluido."
+echo "Revisao anterior: $(cat "$STATE_DIR/previous")"

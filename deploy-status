@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+TARGET="${1:-}"
+REPO="diogowernik/logos"
+WORKFLOW="Deploy"
+
+usage() {
+  echo "Uso: ./deploy-status <all|api|web>"
+}
+
+case "$TARGET" in
+  all|api|web) BRANCH="deploy-${TARGET}" ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI (gh) nao encontrado. Instale com: brew install gh"
+  exit 1
+fi
+
+echo "Ultimo deploy de ${TARGET} (${BRANCH}):"
+gh run list \
+  --repo "$REPO" \
+  --workflow "$WORKFLOW" \
+  --branch "$BRANCH" \
+  --limit 1 \
+  --json status,conclusion,displayTitle,headBranch,event,databaseId,startedAt,updatedAt,url,headSha \
+  --template '{{range .}}{{tablerow "Status" .status}}{{tablerow "Resultado" .conclusion}}{{tablerow "Titulo" .displayTitle}}{{tablerow "Branch" .headBranch}}{{tablerow "Evento" .event}}{{tablerow "Commit" (printf "%.7s" .headSha)}}{{tablerow "Inicio" .startedAt}}{{tablerow "Atualizado" .updatedAt}}{{tablerow "Run ID" (printf "%.0f" .databaseId)}}{{tablerow "URL" .url}}{{end}}'

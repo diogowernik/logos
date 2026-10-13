@@ -151,7 +151,8 @@ if [[ "$TARGET" == "all" || "$TARGET" == "web" ]]; then
   fi
 
   echo "Gerando build da web..."
-  npm run build --prefix "$ROOT_DIR/web"
+  NODE_OPTIONS="${LOGOS_NODE_OPTIONS:---max-old-space-size=1024}" \
+    npm run build --prefix "$ROOT_DIR/web"
 
   if pm2 describe "$WEB_PROCESS" >/dev/null 2>&1; then
     PORT="$WEB_PORT" DJANGO_API_URL="http://127.0.0.1:$API_PORT" \

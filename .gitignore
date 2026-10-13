@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 .ruff_cache/
+*.egg-info/
+.deploy/
 node_modules/
 .next/
 .next-codex/

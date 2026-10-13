@@ -2,7 +2,7 @@
 
 O Logos roda em um único servidor, com Nginx na borda e dois processos PM2:
 `logos-web` em `3026` e `logos-api` em `8026`. O domínio público é
-`logos.wtr.ee`; o Django permanece interno e o Next faz o proxy da API.
+`books.wtr.ee`; o Django permanece interno e o Next faz o proxy da API.
 
 O servidor mantém o checkout em `/home/wtr/logos`. Banco, ambientes e
 `api/media/` são persistentes e ficam fora do Git. No primeiro envio, copie o

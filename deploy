@@ -84,6 +84,7 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${LOGOS_VENV_DIR:-$ROOT_DIR/.venv}"
 PYTHON="$VENV_DIR/bin/python"
+PIP="$VENV_DIR/bin/pip"
 GUNICORN="$VENV_DIR/bin/gunicorn"
 LOCK_FILE="${DEPLOY_LOCK_FILE:-/tmp/logos-deploy.lock}"
 STATE_DIR="$ROOT_DIR/.deploy"
@@ -103,7 +104,7 @@ cd "$ROOT_DIR"
 mkdir -p "$STATE_DIR"
 git rev-parse HEAD > "$STATE_DIR/previous"
 
-echo "Deploy do Logos: $TARGET"
+echo "Deploy do Books: $TARGET"
 if [[ "$SKIP_PULL" == "0" ]]; then
   echo "Atualizando codigo..."
   git pull --ff-only origin "$BRANCH"
@@ -121,7 +122,7 @@ if [[ "$TARGET" == "all" || "$TARGET" == "api" ]]; then
 
   if [[ "$INSTALL_DEPS" == "1" ]]; then
     echo "Instalando dependencias da API..."
-    "$VENV_DIR/bin/pip" install -e "$ROOT_DIR/api[production]"
+    "$PIP" install -e "$ROOT_DIR/api[production]"
     "$PYTHON" "$ROOT_DIR/api/manage.py" collectstatic --noinput
   else
     echo "Pulando dependencias e collectstatic da API."
@@ -151,7 +152,7 @@ if [[ "$TARGET" == "all" || "$TARGET" == "web" ]]; then
   fi
 
   echo "Gerando build da web..."
-  NODE_OPTIONS="${LOGOS_NODE_OPTIONS:---max-old-space-size=1024}" \
+  NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=${LOGOS_WEB_BUILD_HEAP_MB:-1024}" \
     npm run build --prefix "$ROOT_DIR/web"
 
   if pm2 describe "$WEB_PROCESS" >/dev/null 2>&1; then

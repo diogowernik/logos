@@ -1,29 +1,51 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
 jobs:
-  foundation:
+  backend:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_ENV: development
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - uses: astral-sh/setup-uv@v6
+      - run: UV_PROJECT_ENVIRONMENT="$GITHUB_WORKSPACE/.venv" uv sync --project api --frozen
+      - run: .venv/bin/ruff check api
+      - run: .venv/bin/python api/manage.py makemigrations --check --dry-run
+      - run: .venv/bin/python api/manage.py test
+
+  frontend:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_DIST_DIR: .next-codex
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: bash scripts/setup.sh
-      - run: .venv/bin/ruff check api
-      - run: .venv/bin/python api/manage.py test
-        env:
-          DJANGO_ENV: development
-      - run: .venv/bin/python api/manage.py makemigrations --check --dry-run
-        env:
-          DJANGO_ENV: development
-      - run: npm run lint && npm test && npm run typecheck && npm run build
-        working-directory: web
-        env:
-          NEXT_DIST_DIR: .next-codex
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@v6
+      - run: UV_PROJECT_ENVIRONMENT="$GITHUB_WORKSPACE/.venv" uv sync --project api --frozen
+        working-directory: .
       - run: .venv/bin/python scripts/test_auth.py
+        working-directory: .

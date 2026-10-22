@@ -11,6 +11,11 @@ Concluir ou abandonar um item exige removê-lo; não converter a lista em histó
   relativas nos Markdown importados.
 - Recuperação de jobs interrompidos; processamento assíncrono quando necessário.
 - Validação com EPUBCheck e avaliação de compatibilidade Kindle.
+- Enviar ao Kindle: remetente transacional `books@wtr.ee` por API HTTPS, sem
+  caixa de entrada ou servidor SMTP próprio. Manter credencial somente no
+  backend, enviar o EPUB existente ao endereço Kindle configurado pelo usuário
+  e não aceitar destinatário arbitrário. A interface deve informar envio,
+  sucesso e falha sem bloquear o restante do livro.
 
 ## Direções a avaliar pelo uso
 

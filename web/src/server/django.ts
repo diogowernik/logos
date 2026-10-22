@@ -13,7 +13,7 @@ export type CurrentUser = { id: number; username: string };
 export function getDjangoBase(): string {
   const configured = process.env.DJANGO_API_URL?.replace(/\/$/, "");
   if (configured) return configured;
-  if (process.env.NODE_ENV !== "production") return "http://127.0.0.1:8000";
+  if (process.env.NODE_ENV !== "production") return "http://127.0.0.1:8026";
   throw new BackendError();
 }
 

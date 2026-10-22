@@ -7,9 +7,6 @@
 - Leia apenas o documento pertinente: [domínio](docs/product.md),
   [contratos](docs/technical.md), [interface](docs/frontend-guide.md) ou
   [ambiente](docs/development.md). Não percorra toda a documentação a cada ajuste.
-- Quando Serena estiver configurado, consulte o inventário completo e carregue
-  suas instruções antes de buscas semânticas. Não faça onboarding nem grave
-  memórias automaticamente. Use `rg` para buscas textuais e arquivos não simbólicos.
 - Não altere dados locais, ambientes, dependências ou o legado sem necessidade
   e autorização da tarefa. Não copie segredos de projetos de referência.
 
@@ -45,6 +42,7 @@
 
 ## Integração e ambiente
 
+- Leia [deploy](docs/deployment.md) antes de commit, push ou publicação.
 - Django é dono dos dados e autorização. Browser usa o proxy Next; token fica
   em cookie HttpOnly. Endpoints privados filtram pelo proprietário e páginas
   chamam `requireUser()` antes de carregar conteúdo.

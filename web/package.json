@@ -6,9 +6,9 @@
     "node": ">=22 <25"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "PORT=${PORT:-3026} next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "PORT=${PORT:-3026} next start",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint",
     "test": "vitest run"

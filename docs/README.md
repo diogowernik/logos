@@ -6,6 +6,7 @@
 | [Interface](frontend-guide.md) | Herança do padrão visual e cuidados com estado da interface. |
 | [Contratos](technical.md) | Integração frontend/backend, importação e arquivos privados. |
 | [Desenvolvimento](development.md) | Preparar, executar, validar e manter o ambiente local. |
+| [Deploy](deployment.md) | Produção, publicação seletiva e persistência de banco e mídia. |
 | [Pendências](roadmap.md) | Recursos ainda relevantes, sem compromisso de ordem. |
 
 Leia o documento correspondente à tarefa. Detalhes evidentes de implementação

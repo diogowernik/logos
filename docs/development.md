@@ -18,15 +18,15 @@ quando ausentes. Não cria credenciais. Não execute esse setup sobre produção
 Em terminais separados:
 
 ```bash
-./.venv/bin/python api/manage.py runserver 127.0.0.1:8000
+./.venv/bin/python api/manage.py runserver 127.0.0.1:8026
 ```
 
 ```bash
 cd web
-npm run dev -- --port 3000
+npm run dev
 ```
 
-Abra `http://localhost:3000`. Ao mudar portas, ajuste `DJANGO_API_URL` e origens.
+Abra `http://localhost:3026`. Ao mudar portas, ajuste `DJANGO_API_URL` e origens.
 Ambientes: `api/.env` e `web/.env.local`; o usuário Django autentica no frontend.
 
 ## Validação conforme a mudança

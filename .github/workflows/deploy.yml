@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: Parte do Logos para publicar
+        description: Parte do Books para publicar
         required: true
         type: choice
         options:
@@ -23,7 +23,7 @@ on:
         type: boolean
 
 concurrency:
-  group: logos-deploy-${{ github.event.inputs.target || github.ref_name }}
+  group: logos-production-deploy
   cancel-in-progress: false
 
 jobs:

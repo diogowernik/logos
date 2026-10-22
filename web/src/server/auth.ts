@@ -5,8 +5,8 @@ import { fetchCurrentUser } from "./django";
 
 const currentUser = cache(fetchCurrentUser);
 
-export async function requireUser() {
+export async function requireUser(destination?: "/pwa") {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(destination === "/pwa" ? "/login?next=/pwa" : "/login");
   return user;
 }

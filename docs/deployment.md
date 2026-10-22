@@ -70,6 +70,11 @@ No servidor, o equivalente é `./deploy all --install`. Instalação de pacotes 
 `collectstatic` rodam somente com `--install`. O deploy da API cria backup do
 SQLite antes das migrations.
 
+O desbloqueio do dispositivo acrescenta dependências WebAuthn na API e na web
+e migrations em `device_security`. Na primeira publicação desse recurso, use
+o alvo `all` com instalação habilitada. Confira `WEBAUTHN_ALLOWED_ORIGINS` se
+a origem pública diferir de `https://books.wtr.ee`.
+
 O acesso do Actions ao servidor e o acesso de leitura do servidor ao GitHub
 usam chaves separadas. Configure no repositório os secrets `DEPLOY_SSH_HOST`,
 `DEPLOY_SSH_USER`, `DEPLOY_SSH_PORT` e `DEPLOY_SSH_KEY`. Nunca coloque chaves,

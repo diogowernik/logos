@@ -185,3 +185,7 @@ export function CleanIcon() {
 export function RefreshIcon() {
   return <Icon><path d="M20 7a8 8 0 1 0 1 8M20 3v5h-5" /></Icon>;
 }
+
+export function LockIcon() {
+  return <Icon><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3" /></Icon>;
+}

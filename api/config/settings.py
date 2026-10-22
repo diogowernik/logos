@@ -12,6 +12,7 @@ DEBUG, SECRET_KEY, ALLOWED_HOSTS = runtime_settings()
 PRODUCTION = os.getenv("DJANGO_ENV", "production") == "production"
 
 INSTALLED_APPS = [
+    "device_security",
     "library",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -84,3 +85,7 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
 }
 DJOSER = {"PERMISSIONS": {"user_create": ["rest_framework.permissions.IsAdminUser"]}}
+
+WEBAUTHN_ALLOWED_ORIGINS = env_list(
+    "WEBAUTHN_ALLOWED_ORIGINS", "http://localhost:3026,https://books.wtr.ee"
+)

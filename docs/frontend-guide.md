@@ -76,6 +76,12 @@ selecionado ocupa a leitura lateral; clicar para ler não implica entrar na edi�
 Para mudanças no shell, preserve rascunho, foco e navegação cancelada. A validação
 visual é feita pelo usuário com prints.
 
+O desbloqueio opcional usa diálogo fullscreen com os controles MUI padrão.
+`theme/device-lock.ts` oculta a interface e seus portais durante o bloqueio;
+mantém componentes montados para preservar rascunhos. Só a superfície de
+desbloqueio fica visível e interativa. O contrato está em
+[instalação como PWA](technical.md#instalação-como-pwa).
+
 O leitor de EPUB é compartilhado em `features/library/EpubReader.tsx`, com
 geometria em `theme/epub-reader.ts`. Carrega EPUB.js somente ao abrir o modal,
 busca o arquivo pelo proxy privado e preserva a formatação do livro. Scripts

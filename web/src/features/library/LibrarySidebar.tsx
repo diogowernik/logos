@@ -31,6 +31,8 @@ import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
 import { ActionMenu } from "@/components/ui/ActionMenu";
 import { SidebarRow, SidebarRowActions } from "@/theme/workspace";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 
 const textDragType = "application/x-logos-text";
 
@@ -38,6 +40,7 @@ export function LibrarySidebar() {
   const library = useLibrary();
   const router = useRouter();
   const pathname = usePathname();
+  const wide = useMediaQuery("(min-width: 1280px)");
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [recentPreference, setRecentPreference] = useState<boolean | null>(null);
@@ -129,6 +132,7 @@ export function LibrarySidebar() {
         </ListItemIcon>
         <ListItemText primary="Biblioteca" />
       </ListItemButton>
+      {!wide && <InstallAppButton />}
       <SidebarSection
         title="Projetos"
         open={projectsOpen}

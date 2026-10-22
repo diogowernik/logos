@@ -51,3 +51,13 @@ it("keeps the form available and displays a recoverable login error", async () =
   expect(screen.getByRole("button", { name: "Entrar" })).toBeEnabled();
   expect(router.replace).not.toHaveBeenCalled();
 });
+
+it("returns to the PWA entry after a successful login", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ok: true })));
+  render(<LoginForm destination="/pwa" />);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText(/Usuário/), "example");
+  await user.type(screen.getByLabelText(/Senha/), "password");
+  await user.click(screen.getByRole("button", { name: "Entrar" }));
+  expect(router.replace).toHaveBeenCalledWith("/pwa");
+});

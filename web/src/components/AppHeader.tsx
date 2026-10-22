@@ -12,9 +12,13 @@ import { SidebarIcon } from "./icons/NavigationIcons";
 import { appConfig } from "@/config/app";
 import { alpha } from "@mui/material/styles";
 import { useShell } from "./shell/AppShell";
+import { InstallAppButton } from "./pwa/InstallAppButton";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { DeviceLockAction } from "@/features/device-lock/DeviceLockProvider";
 export function AppHeader() {
   const pathname = usePathname();
   const shell = useShell();
+  const wide = useMediaQuery("(min-width: 1280px)");
   return (
     <AppBar
       position="static"
@@ -82,6 +86,8 @@ export function AppHeader() {
             );
           })}
         </Box>
+        {wide && <InstallAppButton />}
+        <DeviceLockAction />
         <LogoutButton />
         {shell.hasRight && (
           <IconButton

@@ -23,6 +23,55 @@ Motores `epub/` e `epub_import/` recebem dados simples, sem ORM ou gestão de st
 Manifestos/locks definem dependências. Logos é independente do App Creator;
 `.app-creator.json` registra proveniência, não atualização automática.
 
+## Instalação como PWA
+
+O manifesto do Next identifica o app instalado como `books`, com os ícones do
+Logos original. O identificador `/` é estável, mesmo com a entrada em `/pwa`.
+A ação Instalar fica no cabeçalho em telas largas e na navegação lateral nas
+demais. Usa o prompt nativo quando disponível e guia com ícone no iPhone/iPad.
+Em modo standalone, a ação fica oculta.
+
+A entrada `/pwa` retoma a última rota conhecida por conta neste dispositivo;
+o endereço legado `/?source=pwa` encaminha para essa entrada.
+Só guarda caminhos de biblioteca, coleção, livro/leitura e texto existente,
+sem parâmetros, rascunhos ou criação. Antes de retomar um recurso, confere o
+acesso na API privada; sem permissão ou excluído usa a biblioteca. Falha de rede
+oferece nova tentativa sem descartar o destino. Sem sessão, o login retorna
+à entrada `/pwa`. Links comuns mantêm o comportamento normal.
+
+O service worker é registrado somente em produção e contexto seguro (HTTPS
+ou localhost). Seu cache contém exclusivamente manifesto e ícones públicos:
+páginas, chamadas da API, autenticação e arquivos privados continuam na rede.
+Não há leitura ou edição offline. O worker usa atualização sem cache HTTP;
+novas versões removem somente caches anteriores com o prefixo `books-pwa-`.
+Falha ao precachear os recursos opcionais não impede a ativação do worker.
+
+### Desbloqueio opcional do dispositivo
+
+O cadeado abre “Exigir desbloqueio neste dispositivo”, desativado por padrão.
+Funciona no navegador e no PWA, em contexto seguro com autenticador de
+plataforma. WebAuthn solicita presença e verificação do usuário; o sistema
+decide entre Face ID, Touch ID e código. A senha da conta permite recuperar
+o acesso ou desativar a opção. Cancelamento ou falha mantém a tela bloqueada.
+
+Django verifica cadastro, desbloqueio e desativação em `/api/device-security/`;
+o browser passa pelo proxy `/api/auth/device-lock/`. A origem vem do pedido
+validado e a credencial do cookie HttpOnly por conta, nunca do JSON do cliente.
+Desafios expiram em dois minutos, são consumidos uma vez e vinculados à conta,
+token, origem e finalidade. As tentativas têm limite na API. O banco guarda
+chaves públicas e contadores; não recebe dados biométricos.
+
+A preferência é lida antes da interface autenticada. Ao ocultar a página ou
+alternar de app, a interface é bloqueada sem encerrar a sessão. Após o primeiro
+desbloqueio, editores e diálogos permanecem montados e ocultos durante o bloqueio,
+preservando rascunhos. Isso é privacidade visual sobre a sessão existente, não
+uma autorização adicional das APIs nem criptografia de dados. Não garante
+ocultar a captura de prévia do sistema operacional.
+
+`WEBAUTHN_ALLOWED_ORIGINS` fixa origens exatas; o padrão é
+`http://localhost:3026,https://books.wtr.ee`. Credenciais pertencem à origem:
+cadastro local não habilita produção. Mudanças de domínio exigem nova inscrição.
+
 ## Modelo e destinos
 
 Project possui owner, Collection, identidade, capa e `default_group`. TextGroup

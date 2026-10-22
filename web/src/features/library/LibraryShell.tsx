@@ -15,6 +15,8 @@ import Alert from "@mui/material/Alert";
 import { AppShell } from "@/components/shell/AppShell";
 import { AppHeader } from "@/components/AppHeader";
 import { LibrarySidebar } from "./LibrarySidebar";
+import { usePathname } from "next/navigation";
+import { lastPageKey, resumablePage } from "@/components/pwa/navigation";
 
 function useLibraryState() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -88,8 +90,16 @@ export function useLibrary() {
   return context;
 }
 
-export function LibraryShell({ children }: { children: ReactNode }) {
+export function LibraryShell({ children, userId }: { children: ReactNode; userId?: number }) {
   const state = useLibraryState();
+  const pathname = usePathname();
+  useEffect(() => {
+    if (userId === undefined) return;
+    const page = resumablePage(pathname);
+    if (!page) return;
+    try { localStorage.setItem(lastPageKey(userId), page); }
+    catch { /* Navigation works without storage. */ }
+  }, [pathname, userId]);
   return (
     <LibraryContext.Provider value={state}>
       <AppShell

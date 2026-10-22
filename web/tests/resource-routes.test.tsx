@@ -50,3 +50,7 @@ it("shows not found for inaccessible references", async () => {
   mocks.fetch.mockResolvedValue({ status: 404 });
   await expect(ProjectPage({ params: Promise.resolve({ id: "privado" }), searchParams: Promise.resolve({}) })).rejects.toThrow("not-found");
 });
+
+it("routes the legacy PWA entry through the authenticated launch flow", async () => {
+  await expect(HomePage({ searchParams: Promise.resolve({ source: "pwa" }) })).rejects.toThrow("redirect:/pwa");
+});

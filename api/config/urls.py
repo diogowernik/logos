@@ -4,6 +4,7 @@ from django.urls import include, path
 from .views import HealthCheckView
 
 urlpatterns = [
+    path("api/device-security/", include("device_security.urls")),
     path("api/library/", include("library.urls")),
     path("admin/", admin.site.urls),
     path("auth/", include("djoser.urls")),

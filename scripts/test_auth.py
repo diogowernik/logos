@@ -104,6 +104,10 @@ def run() -> None:
                 status, headers, body = call(web_base + "/")
                 assert status == 307 and headers["Location"] == "/login", "Anonymous page not protected"
                 assert b"Ainda n" not in body, "Private page leaked"
+                status, headers, _ = call(web_base + "/pwa")
+                assert status == 307 and headers["Location"] == "/login?next=/pwa"
+                assert call(web_base + "/api/auth/device-lock/password-unlock", method="POST",
+                            data={"password": "invalid"}, origin=web_base)[0] == 401
                 credentials = {"username": "auth-test", "password": "temporary-test-password"}
                 assert call(web_base + "/api/auth/login", method="POST", data=credentials,
                             origin="https://foreign.example")[0] == 403
@@ -121,6 +125,20 @@ def run() -> None:
                 assert status == 200 and json.loads(body)["user"]["username"] == "auth-test"
                 assert call(web_base + "/", cookie=cookie)[0] == 200
                 assert call(web_base + "/login", cookie=cookie)[0] == 307
+                assert call(web_base + "/pwa", cookie=cookie)[0] == 200
+                status, headers, _ = call(web_base + "/login?next=/pwa", cookie=cookie)
+                assert status == 307 and headers["Location"] == "/pwa"
+                unlock_url = web_base + "/api/auth/device-lock/password-unlock"
+                assert call(unlock_url, method="POST", data={"password": "invalid"},
+                            cookie=cookie, origin="https://foreign.example")[0] == 403
+                assert call(unlock_url, method="POST", data={"password": "invalid"},
+                            cookie=cookie, origin=web_base)[0] == 400
+                status, headers, body = call(unlock_url, method="POST",
+                                            data={"password": credentials["password"]},
+                                            cookie=cookie, origin=web_base)
+                assert status == 200 and json.loads(body) == {"unlocked": True}
+                assert "no-store" in headers["Cache-Control"]
+                assert not headers.get("Set-Cookie"), "Password unlock enabled device preference"
 
                 status, headers, body = call(web_base + "/api/auth/session",
                                             cookie="logos_auth=invalid")

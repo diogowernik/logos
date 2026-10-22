@@ -7,7 +7,7 @@ import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import { apiRequest } from "@/api/client";
 
-export function LoginForm() {
+export function LoginForm({ destination = "/" }: { destination?: "/" | "/pwa" }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -24,7 +24,7 @@ export function LoginForm() {
           password: form.get("password"),
         }),
       });
-      router.replace("/");
+      router.replace(destination);
       router.refresh();
     } catch (reason) {
       setError(

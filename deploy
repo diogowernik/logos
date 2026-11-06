@@ -37,8 +37,8 @@ case "$TARGET" in
     ;;
 esac
 
-WEB_PORT="${LOGOS_WEB_PORT:-3026}"
-API_PORT="${LOGOS_API_PORT:-8026}"
+WEB_PORT="${LOGOS_WEB_PORT:-3072}"
+API_PORT="${LOGOS_API_PORT:-8072}"
 WEB_PROCESS="logos-web"
 API_PROCESS="logos-api"
 

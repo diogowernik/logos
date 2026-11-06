@@ -1,8 +1,9 @@
 # Deploy
 
 O Books roda em um único servidor, com Nginx na borda e dois processos PM2:
-`logos-web` em `3026` e `logos-api` em `8026`. O domínio público é
+`logos-web` em `3072` e `logos-api` em `8072`. O domínio público é
 `books.wtr.ee`; o Django permanece interno e o Next faz o proxy da API.
+As portas de produção seguem a sequência de 18 em 18 dos aplicativos no host.
 
 O servidor mantém o checkout em `/home/wtr/logos`. Banco, ambientes e
 `api/media/` são persistentes e ficam fora do Git. No primeiro envio, copie o
@@ -85,7 +86,7 @@ tokens ou ambientes no remote Git, no PM2 ou na documentação.
 Espere `completed` e `success` no workflow e confira os processos e a API:
 
 ```bash
-ssh wtr 'pm2 status; curl -fsS http://127.0.0.1:8026/api/health/'
+ssh wtr 'pm2 status; curl -fsS http://127.0.0.1:8072/api/health/'
 ```
 
 Valide os fluxos afetados em `https://books.wtr.ee`. O health check não
@@ -112,7 +113,7 @@ Crie o checkout com uma Deploy Key de leitura exclusiva do Logos, prepare
 ./deploy all --install --skip-pull
 ```
 
-Depois configure o site Nginx para `127.0.0.1:3026`, valide localmente, aponte o
+Depois configure o site Nginx para `127.0.0.1:3072`, valide localmente, aponte o
 DNS e emita o certificado. Salve a lista do PM2 após os dois processos estarem
 saudáveis. Os processos compartilham o serviço systemd já existente do usuário
 `wtr`; não crie outro daemon PM2.
